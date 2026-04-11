@@ -1,0 +1,23 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model PaymentIntent {
+  id            String   @id @default(cuid())
+  merchantWallet String
+  amountAtomic  String
+  mint          String
+  status        String   @default("active")
+  note          String   @default("")
+  customerLabel String?
+  expiresAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([merchantWallet])
+  @@index([status])
+}
