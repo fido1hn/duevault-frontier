@@ -4,10 +4,6 @@ import "@/app/globals.css";
 import { Navigation } from "@/components/navigation";
 import { AppProviders } from "@/components/providers/app-providers";
 import { BRAND_DESCRIPTION, BRAND_NAME } from "@/lib/brand";
-import { Inter } from "next/font/google";
-import { cn } from "@/lib/utils";
-
-const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: BRAND_NAME,
@@ -20,7 +16,7 @@ type RootLayoutProps = Readonly<{
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="en" className={cn("font-sans", inter.variable)}>
+    <html lang="en" className="font-sans">
       <body>
         <AppProviders>
           <div className="app-shell">

@@ -1,15 +1,15 @@
-# Settlemark
+# DueVault
 
-Settlemark is a private payments product built on Umbra for merchants, freelancers, and service businesses that want business-grade Solana payments without exposing balances, counterparties, or revenue onchain.
+DueVault is private accounts receivable software built on Umbra for merchants, freelancers, and service businesses that want business-grade Solana stablecoin billing without exposing balances, counterparties, or revenue onchain.
 
-Primary tagline: `Private settlement rails for modern business`
+Primary tagline: `Private receivables for stablecoin businesses`
 
 This repository is currently on **step 1 foundation**:
 
 - Next.js App Router skeleton
 - Solana wallet provider shell
 - Prisma + SQLite for off-chain payment-request records
- - minimal merchant pages and payment-request API routes
+- minimal merchant pages and payment-request API routes
 - Umbra SDK kept behind a clean app-facing service boundary
 
 ## Current scope

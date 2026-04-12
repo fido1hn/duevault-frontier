@@ -23,7 +23,7 @@ export default async function PayIntentPage({ params }: PayPageProps) {
     <>
       <section className="page-header">
         <p className="eyebrow">Public checkout</p>
-        <h1>Settlemark checkout shell</h1>
+        <h1>DueVault checkout shell</h1>
         <p className="muted">
           This page resolves a real local payment request by ID. Live payment
           submission is intentionally deferred until the Umbra settlement step.

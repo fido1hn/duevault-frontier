@@ -19,7 +19,7 @@ export type PrivatePaymentResult = {
 export async function registerUser(): Promise<UmbraRegistrationResult> {
   return {
     mode: "stub",
-    message: "Settlemark Umbra registration is not wired in step 1.",
+    message: "DueVault Umbra registration is not wired in step 1.",
   };
 }
 

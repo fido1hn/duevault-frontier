@@ -23,10 +23,10 @@ import {
 } from "@umbra-privacy/web-zk-prover";
 import { address } from "@solana/kit";
 
-type SettlemarkNetwork = "mainnet" | "devnet";
+type DueVaultNetwork = "mainnet" | "devnet";
 
-type SettlemarkConfig = {
-  network: SettlemarkNetwork;
+type DueVaultConfig = {
+  network: DueVaultNetwork;
   rpcUrl: string;
   rpcSubscriptionsUrl: string;
   signer: IUmbraSigner;
@@ -71,7 +71,7 @@ export const UMBRA_MAINNET_MINTS = {
   UMBRA: "PRVT6TB7uss3FrUd2D9xs2zqDBsa3GbMJMwCQsgmeta",
 } as const;
 
-export async function createSettlemarkClient(config: SettlemarkConfig) {
+export async function createDueVaultClient(config: DueVaultConfig) {
   return getUmbraClient({
     signer: config.signer,
     network: config.network,
@@ -81,8 +81,8 @@ export async function createSettlemarkClient(config: SettlemarkConfig) {
   });
 }
 
-export async function registerSettlemarkUser(config: SettlemarkConfig) {
-  const client = await createSettlemarkClient(config);
+export async function registerDueVaultUser(config: DueVaultConfig) {
+  const client = await createDueVaultClient(config);
   const register = getUserRegistrationFunction({ client });
 
   return register({
@@ -92,11 +92,11 @@ export async function registerSettlemarkUser(config: SettlemarkConfig) {
 }
 
 export async function depositPrivateBalance(
-  config: SettlemarkConfig,
+  config: DueVaultConfig,
   mint: string,
   amount: bigint,
 ) {
-  const client = await createSettlemarkClient(config);
+  const client = await createDueVaultClient(config);
   const deposit = getPublicBalanceToEncryptedBalanceDirectDepositorFunction({
     client,
   });
@@ -105,11 +105,11 @@ export async function depositPrivateBalance(
 }
 
 export async function withdrawPrivateBalance(
-  config: SettlemarkConfig,
+  config: DueVaultConfig,
   mint: string,
   amount: bigint,
 ) {
-  const client = await createSettlemarkClient(config);
+  const client = await createDueVaultClient(config);
   const withdraw = getEncryptedBalanceToPublicBalanceDirectWithdrawerFunction({
     client,
   });
@@ -118,10 +118,10 @@ export async function withdrawPrivateBalance(
 }
 
 export async function createPrivatePayment(
-  config: SettlemarkConfig,
+  config: DueVaultConfig,
   request: PrivatePaymentRequest,
 ) {
-  const client = await createSettlemarkClient(config);
+  const client = await createDueVaultClient(config);
   const zkProver = getCreateReceiverClaimableUtxoFromPublicBalanceProver();
   const createUtxo = getPublicBalanceToReceiverClaimableUtxoCreatorFunction(
     { client },
@@ -135,8 +135,8 @@ export async function createPrivatePayment(
   });
 }
 
-export async function claimIncomingPayments(config: SettlemarkConfig) {
-  const client = await createSettlemarkClient(config);
+export async function claimIncomingPayments(config: DueVaultConfig) {
+  const client = await createDueVaultClient(config);
   const fetchClaimable = getClaimableUtxoScannerFunction({ client });
   const { received } = await fetchClaimable(toU32(0n), toU32(0n));
 
@@ -161,10 +161,10 @@ export async function claimIncomingPayments(config: SettlemarkConfig) {
 }
 
 export async function issueAuditorGrant(
-  config: SettlemarkConfig,
+  config: DueVaultConfig,
   request: ComplianceGrantRequest,
 ) {
-  const client = await createSettlemarkClient(config);
+  const client = await createDueVaultClient(config);
   const createGrant = getComplianceGrantIssuerFunction({ client });
   const generateMvkKeypair = getMasterViewingKeyX25519KeypairDeriver({
     client,
@@ -202,10 +202,10 @@ export async function issueAuditorGrant(
 }
 
 export async function revokeAuditorGrant(
-  config: SettlemarkConfig,
+  config: DueVaultConfig,
   grant: Awaited<ReturnType<typeof issueAuditorGrant>>,
 ) {
-  const client = await createSettlemarkClient(config);
+  const client = await createDueVaultClient(config);
   const revokeGrant = getComplianceGrantRevokerFunction({ client });
 
   return revokeGrant(
@@ -217,12 +217,12 @@ export async function revokeAuditorGrant(
 }
 
 export async function requestAuditorReencryption(
-  config: SettlemarkConfig,
+  config: DueVaultConfig,
   grant: Awaited<ReturnType<typeof issueAuditorGrant>>,
   inputEncryptionNonce: bigint | RcEncryptionNonce,
   ciphertexts: readonly Uint8Array[],
 ) {
-  const client = await createSettlemarkClient(config);
+  const client = await createDueVaultClient(config);
   const reencrypt = getSharedCiphertextReencryptorForUserGrantFunction({
     client,
   });

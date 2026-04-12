@@ -25,7 +25,7 @@ export default async function DashboardPage() {
         <p className="muted">
           Live private balances are still stubbed in step 1. The records below
           are real local payment requests backed by Prisma and SQLite, which
-          gives Settlemark its first operational ledger for settlement flows.
+          gives DueVault its first operational ledger for settlement flows.
         </p>
       </section>
 

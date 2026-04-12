@@ -5,8 +5,43 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: var(--font-sans);
+    --font-heading: "IBM Plex Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --font-sans: "IBM Plex Sans", "Avenir Next", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --color-background-50: var(--background-50);
+    --color-background-100: var(--background-100);
+    --color-background-200: var(--background-200);
+    --color-background-300: var(--background-300);
+    --color-highlight-50: var(--highlight-50);
+    --color-highlight-100: var(--highlight-100);
+    --color-highlight-200: var(--highlight-200);
+    --color-highlight-300: var(--highlight-300);
+    --color-highlight-400: var(--highlight-400);
+    --color-highlight-500: var(--highlight-500);
+    --color-highlight-600: var(--highlight-600);
+    --color-support-50: var(--support-50);
+    --color-support-100: var(--support-100);
+    --color-support-200: var(--support-200);
+    --color-support-300: var(--support-300);
+    --color-support-400: var(--support-400);
+    --color-support-500: var(--support-500);
+    --color-support-600: var(--support-600);
+    --color-slate-50: var(--slate-50);
+    --color-slate-100: var(--slate-100);
+    --color-slate-200: var(--slate-200);
+    --color-slate-300: var(--slate-300);
+    --color-slate-400: var(--slate-400);
+    --color-slate-500: var(--slate-500);
+    --color-slate-600: var(--slate-600);
+    --color-deep-50: var(--deep-50);
+    --color-deep-100: var(--deep-100);
+    --color-deep-200: var(--deep-200);
+    --color-deep-300: var(--deep-300);
+    --color-deep-400: var(--deep-400);
+    --color-deep-500: var(--deep-500);
+    --color-deep-600: var(--deep-600);
+    --color-deep-700: var(--deep-700);
+    --color-deep-800: var(--deep-800);
+    --color-deep-900: var(--deep-900);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,72 +83,107 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
+    --background-50: #fff8ef;
+    --background-100: #ffead0;
+    --background-200: #ffd9ad;
+    --background-300: #ffc37f;
+    --highlight-50: #fff1f4;
+    --highlight-100: #ffd9e1;
+    --highlight-200: #ffb7c6;
+    --highlight-300: #ff94aa;
+    --highlight-400: #f76f8e;
+    --highlight-500: #e94f75;
+    --highlight-600: #c73a5d;
+    --support-50: #faf4f5;
+    --support-100: #eddfe2;
+    --support-200: #dec2c8;
+    --support-300: #c99da8;
+    --support-400: #b27b88;
+    --support-500: #96616b;
+    --support-600: #7d4d56;
+    --slate-50: #eef5f7;
+    --slate-100: #d7e5e9;
+    --slate-200: #b2cbd3;
+    --slate-300: #87abb7;
+    --slate-400: #5d8290;
+    --slate-500: #37505c;
+    --slate-600: #2f454f;
+    --deep-50: #eef6f5;
+    --deep-100: #d7e7e6;
+    --deep-200: #b0d0cd;
+    --deep-300: #82aea9;
+    --deep-400: #578981;
+    --deep-500: #2f625e;
+    --deep-600: #244f4b;
+    --deep-700: #1c413e;
+    --deep-800: #113537;
+    --deep-900: #0a2426;
+    --background: var(--background-100);
+    --foreground: var(--deep-800);
+    --card: var(--background-50);
+    --card-foreground: var(--deep-800);
+    --popover: var(--background-50);
+    --popover-foreground: var(--deep-800);
+    --primary: var(--deep-800);
+    --primary-foreground: var(--background-50);
+    --secondary: var(--support-100);
+    --secondary-foreground: var(--deep-800);
+    --muted: color-mix(in oklab, var(--background-100) 74%, white);
+    --muted-foreground: var(--slate-500);
+    --accent: var(--highlight-400);
+    --accent-foreground: var(--deep-800);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
+    --border: color-mix(in oklab, var(--support-300) 42%, var(--background-100));
+    --input: color-mix(in oklab, var(--support-300) 48%, var(--background-100));
+    --ring: var(--highlight-400);
+    --chart-1: var(--highlight-400);
+    --chart-2: var(--support-500);
+    --chart-3: var(--slate-500);
+    --chart-4: var(--deep-800);
+    --chart-5: var(--background-300);
     --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --sidebar: var(--background-50);
+    --sidebar-foreground: var(--deep-800);
+    --sidebar-primary: var(--deep-800);
+    --sidebar-primary-foreground: var(--background-50);
+    --sidebar-accent: var(--support-100);
+    --sidebar-accent-foreground: var(--deep-800);
+    --sidebar-border: var(--border);
+    --sidebar-ring: var(--highlight-400);
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
+    --background: var(--deep-900);
+    --foreground: var(--background-50);
+    --card: var(--deep-800);
+    --card-foreground: var(--background-50);
+    --popover: var(--deep-800);
+    --popover-foreground: var(--background-50);
+    --primary: var(--highlight-400);
+    --primary-foreground: var(--deep-900);
+    --secondary: var(--deep-700);
+    --secondary-foreground: var(--background-50);
+    --muted: color-mix(in oklab, var(--deep-700) 72%, black);
+    --muted-foreground: var(--slate-200);
+    --accent: var(--support-500);
+    --accent-foreground: var(--background-50);
     --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --border: color-mix(in oklab, var(--background-50) 14%, transparent);
+    --input: color-mix(in oklab, var(--background-50) 18%, transparent);
+    --ring: var(--highlight-400);
+    --chart-1: var(--highlight-400);
+    --chart-2: var(--support-300);
+    --chart-3: var(--slate-300);
+    --chart-4: var(--background-100);
+    --chart-5: var(--deep-500);
+    --sidebar: var(--deep-800);
+    --sidebar-foreground: var(--background-50);
+    --sidebar-primary: var(--highlight-400);
+    --sidebar-primary-foreground: var(--deep-900);
+    --sidebar-accent: var(--deep-700);
+    --sidebar-accent-foreground: var(--background-50);
+    --sidebar-border: var(--border);
+    --sidebar-ring: var(--highlight-400);
 }
 
 @layer base {
@@ -126,4 +196,394 @@
   html {
     @apply font-sans;
     }
+}
+
+@layer components {
+  .app-shell {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top left, color-mix(in oklab, var(--accent) 16%, transparent), transparent 28rem),
+      linear-gradient(135deg, var(--background), color-mix(in oklab, var(--background) 86%, white));
+  }
+
+  .site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in oklab, var(--card) 86%, transparent);
+    backdrop-filter: blur(16px);
+  }
+
+  .brand {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .brand-link {
+    color: var(--foreground);
+    font-size: 1.15rem;
+    font-weight: 750;
+    letter-spacing: 0.02em;
+  }
+
+  .brand-tag {
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+  }
+
+  .site-nav,
+  .cta-row,
+  .action-row,
+  .quick-link-list,
+  .intent-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .nav-link {
+    padding: 0.65rem 0.8rem;
+    border-radius: 999px;
+    color: var(--muted-foreground);
+    transition: background 150ms ease, color 150ms ease;
+  }
+
+  .nav-link:hover {
+    background: var(--muted);
+    color: var(--foreground);
+  }
+
+  .wallet-button {
+    background: var(--primary) !important;
+    color: var(--primary-foreground) !important;
+  }
+
+  .page-wrap {
+    width: min(1080px, calc(100% - 2rem));
+    margin: 0 auto;
+    padding: 2rem 0 3rem;
+  }
+
+  .page-header {
+    display: grid;
+    gap: 0.65rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .page-header h1,
+  .page-header h2 {
+    margin: 0;
+  }
+
+  .page-header h1 {
+    max-width: 13ch;
+    font-size: clamp(2.4rem, 8vw, 5.8rem);
+    line-height: 0.88;
+    letter-spacing: -0.075em;
+  }
+
+  .muted {
+    margin: 0;
+    color: var(--muted-foreground);
+    line-height: 1.6;
+  }
+
+  .eyebrow {
+    margin: 0;
+    color: var(--support-500);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .card-grid,
+  .stats-grid,
+  .welcome-hero,
+  .dashboard-grid,
+  .checkout-grid,
+  .intent-list,
+  .detail-stack {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .stats-grid,
+  .home-pillars {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .welcome-hero {
+    grid-template-columns: 1.2fr 0.8fr;
+  }
+
+  .detail-grid {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1.15fr 0.85fr;
+  }
+
+  .card,
+  .stat-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-3xl);
+    background: var(--card);
+    color: var(--card-foreground);
+    box-shadow: 0 24px 70px color-mix(in oklab, var(--deep-800) 10%, transparent);
+  }
+
+  .welcome-panel,
+  .quick-links,
+  .empty-card,
+  .action-card,
+  .form-card,
+  .detail-card,
+  .intent-card,
+  .pillar-card,
+  .stat-card {
+    padding: 1.5rem;
+  }
+
+  .hero-panel {
+    background:
+      radial-gradient(circle at top left, color-mix(in oklab, var(--accent) 18%, transparent), transparent 34%),
+      linear-gradient(180deg, var(--background-50), color-mix(in oklab, var(--background-100) 48%, white));
+  }
+
+  .foundation-panel {
+    background: linear-gradient(180deg, var(--background-50), color-mix(in oklab, var(--support-100) 36%, var(--background-50)));
+  }
+
+  .section-copy {
+    display: grid;
+    gap: 0.45rem;
+    margin-bottom: 1rem;
+  }
+
+  .section-copy h2,
+  .pillar-card h2,
+  .intent-header h2,
+  .detail-card h2 {
+    margin: 0;
+  }
+
+  .feature-list {
+    margin: 0;
+    padding-left: 1.1rem;
+    color: var(--muted-foreground);
+  }
+
+  .brand-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    margin-top: 1rem;
+  }
+
+  .brand-pill,
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+  }
+
+  .brand-pill {
+    min-height: 2.1rem;
+    padding: 0 0.8rem;
+    border: 1px solid color-mix(in oklab, var(--accent) 35%, transparent);
+    background: color-mix(in oklab, var(--accent) 12%, var(--card));
+    color: var(--primary);
+    font-size: 0.88rem;
+    font-weight: 650;
+  }
+
+  .home-pillars {
+    margin-top: 1.5rem;
+  }
+
+  .stat-card strong {
+    display: block;
+    margin-top: 0.5rem;
+    font-size: 1.75rem;
+  }
+
+  .primary-button,
+  .secondary-button,
+  .text-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.75rem;
+    padding: 0 1rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    cursor: pointer;
+    font-weight: 650;
+    transition: background 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
+  }
+
+  .primary-button {
+    background: var(--primary);
+    color: var(--primary-foreground);
+  }
+
+  .primary-button:hover {
+    background: color-mix(in oklab, var(--primary) 88%, black);
+    transform: translateY(-1px);
+  }
+
+  .secondary-button,
+  .text-link {
+    border-color: var(--border);
+    background: color-mix(in oklab, var(--card) 68%, transparent);
+    color: var(--foreground);
+  }
+
+  .text-link:hover,
+  .secondary-button:hover:not(:disabled) {
+    background: var(--muted);
+  }
+
+  .secondary-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+
+  .form-card {
+    max-width: 720px;
+  }
+
+  .field {
+    display: grid;
+    gap: 0.45rem;
+    margin-bottom: 1rem;
+  }
+
+  .field span {
+    font-size: 0.95rem;
+    font-weight: 650;
+  }
+
+  .field input {
+    width: 100%;
+    min-height: 2.9rem;
+    padding: 0 0.9rem;
+    border: 1px solid var(--input);
+    border-radius: var(--radius-xl);
+    background: var(--background);
+    color: var(--foreground);
+  }
+
+  .merchant-hint,
+  .inline-kv {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+    margin-bottom: 1rem;
+    color: var(--muted-foreground);
+  }
+
+  .merchant-hint code,
+  .inline-kv code {
+    padding: 0.2rem 0.45rem;
+    border-radius: var(--radius-sm);
+    background: var(--muted);
+    color: var(--foreground);
+  }
+
+  .error-text {
+    margin: 0 0 1rem;
+    color: var(--destructive);
+  }
+
+  .intent-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .intent-header h2 {
+    margin-top: 0.35rem;
+    font-size: 1.3rem;
+  }
+
+  .intent-meta {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem;
+    margin: 0 0 1rem;
+  }
+
+  .intent-meta dt {
+    color: var(--muted-foreground);
+    font-size: 0.8rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .intent-meta dd {
+    margin: 0.35rem 0 0;
+  }
+
+  .status-pill {
+    min-height: 2rem;
+    padding: 0 0.75rem;
+    background: var(--muted);
+    font-size: 0.875rem;
+    text-transform: capitalize;
+  }
+
+  .status-active {
+    color: var(--primary);
+  }
+
+  .status-paid {
+    color: var(--support-600);
+  }
+
+  .status-claimed {
+    color: var(--deep-500);
+  }
+
+  .status-expired {
+    color: var(--destructive);
+  }
+
+  .status-draft {
+    color: var(--muted-foreground);
+  }
+
+  .detail-card h2 {
+    font-size: 1.7rem;
+  }
+
+  .detail-stack .inline-kv {
+    margin-bottom: 0;
+  }
+}
+
+@media (max-width: 920px) {
+  .site-header,
+  .site-nav {
+    flex-wrap: wrap;
+  }
+
+  .welcome-hero,
+  .home-pillars,
+  .detail-grid,
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-wrap {
+    width: min(100% - 1rem, 1080px);
+  }
 }
