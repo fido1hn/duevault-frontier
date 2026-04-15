@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import "@solana/wallet-adapter-react-ui/styles.css";
 import "@/app/globals.css";
-import { Navigation } from "@/components/navigation";
 import { AppProviders } from "@/components/providers/app-providers";
 import { BRAND_DESCRIPTION, BRAND_NAME } from "@/lib/brand";
 
@@ -16,14 +15,9 @@ type RootLayoutProps = Readonly<{
 
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <html lang="en" className="font-sans">
+    <html lang="en">
       <body>
-        <AppProviders>
-          <div className="app-shell">
-            <Navigation />
-            <main className="page-wrap">{children}</main>
-          </div>
-        </AppProviders>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );

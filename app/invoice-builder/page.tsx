@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
 
-export default function GetPaidRedirect() {
+export default function InvoiceBuilderRedirect() {
   redirect("/invoices/new");
 }
