@@ -107,11 +107,8 @@ export default function Home() {
             </div>
           </Link>
           <nav className="flex items-center gap-2 sm:gap-3">
-            <Button asChild size="sm" variant="outline" className="bg-card/45">
-              <Link href="/dashboard">Login</Link>
-            </Button>
             <Button asChild size="sm">
-              <Link href="/invoices/new">Get Started</Link>
+              <Link href="/waitlist">Join Waitlist</Link>
             </Button>
           </nav>
         </header>
@@ -141,8 +138,8 @@ export default function Home() {
 
               <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <Button asChild size="lg" className="h-14 px-8 text-base">
-                  <Link href="/dashboard">
-                    Open Dashboard <ArrowRight className="size-5" />
+                  <Link href="/waitlist">
+                    Join Waitlist <ArrowRight className="size-5" />
                   </Link>
                 </Button>
                 <Button

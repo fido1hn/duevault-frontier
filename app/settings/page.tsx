@@ -1,6 +1,7 @@
 "use client";
 
 import { AppLayout } from "@/components/layout/app-layout";
+import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -14,11 +15,19 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { business } from "@/lib/demo-data";
 
 export default function SettingsPage() {
   return (
     <AppLayout>
+      <SettingsContent />
+    </AppLayout>
+  );
+}
+
+function SettingsContent() {
+  const { profile } = useMerchantProfile();
+
+  return (
       <div className="mx-auto flex max-w-4xl flex-col gap-8 p-6 md:p-8">
         <header>
           <h1 className="font-serif text-3xl font-semibold tracking-tight text-foreground">
@@ -49,20 +58,20 @@ export default function SettingsPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="flex flex-col gap-2">
                       <Label>Business Name</Label>
-                      <Input defaultValue={business.name} />
+                      <Input defaultValue={profile.businessName} />
                     </div>
                     <div className="flex flex-col gap-2">
                       <Label>Contact Email</Label>
-                      <Input defaultValue={business.email} type="email" />
+                      <Input defaultValue={profile.contactEmail} type="email" />
                     </div>
                   </div>
                   <div className="flex flex-col gap-2">
                     <Label>Business Address</Label>
-                    <Input defaultValue={business.address} />
+                    <Input defaultValue={profile.businessAddress} />
                   </div>
                   <div className="flex flex-col gap-2">
                     <Label>Default Notes</Label>
-                    <Input defaultValue="Thank you for your business. Payment is expected within 30 days." />
+                    <Input defaultValue={profile.defaultNotes} />
                   </div>
                   <Button className="w-fit">Save Changes</Button>
                 </CardContent>
@@ -111,7 +120,7 @@ export default function SettingsPage() {
                     <div>
                       <h3 className="font-medium text-primary">Solana (USDC)</h3>
                       <p className="mt-1 font-mono text-sm text-muted-foreground">
-                        Wallet: {business.wallet}
+                        Wallet: {profile.walletAddress}
                       </p>
                     </div>
                     <Button variant="outline" size="sm">
@@ -154,7 +163,7 @@ export default function SettingsPage() {
                   <div className="flex flex-col gap-2 border-t border-border pt-4">
                     <Label>Public Key (Used to generate stealth addresses)</Label>
                     <Input
-                      defaultValue={business.publicKey}
+                      defaultValue={profile.walletAddress}
                       readOnly
                       className="bg-muted/20 font-mono text-xs text-muted-foreground"
                     />
@@ -165,6 +174,5 @@ export default function SettingsPage() {
           </div>
         </Tabs>
       </div>
-    </AppLayout>
   );
 }

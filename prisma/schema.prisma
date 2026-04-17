@@ -21,3 +21,83 @@ model PaymentIntent {
   @@index([merchantWallet])
   @@index([status])
 }
+
+model MerchantProfile {
+  id                    String    @id @default(cuid())
+  walletAddress         String    @unique
+  businessName          String
+  contactEmail          String
+  businessAddress       String
+  defaultNotes          String    @default("Thank you for your business. Payment is expected within 30 days.")
+  defaultMint           String    @default("USDC")
+  paymentRail           String    @default("solana")
+  privacyRail           String    @default("umbra")
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([contactEmail])
+}
+
+model WaitlistSignup {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  company   String?
+  useCase   String?
+  source    String   @default("homepage")
+  status    String   @default("joined")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([source])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model Customer {
+  id        String    @id @default(cuid())
+  name      String
+  email     String    @unique
+  invoices  Invoice[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Invoice {
+  id                String            @id @default(cuid())
+  invoiceNumber     String            @unique
+  customerId        String
+  customer          Customer          @relation(fields: [customerId], references: [id])
+  customerName      String
+  customerEmail     String
+  status            String            @default("Draft")
+  issuedAt          DateTime
+  dueAt             DateTime
+  notes             String            @default("")
+  paymentRail       String            @default("solana")
+  privacyRail       String            @default("umbra")
+  mint              String            @default("USDC")
+  totalAmountAtomic String
+  lineItems         InvoiceLineItem[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([customerEmail])
+  @@index([dueAt])
+  @@index([status])
+}
+
+model InvoiceLineItem {
+  id               String   @id @default(cuid())
+  invoiceId        String
+  invoice          Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description      String
+  quantity         Int
+  unitAmountAtomic String
+  sortOrder        Int
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([invoiceId])
+}

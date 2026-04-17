@@ -1,7 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { WalletAdapterNetwork } from "@solana/wallet-adapter-base";
+import {
+  WalletAdapterNetwork,
+  type Adapter,
+  type WalletError,
+} from "@solana/wallet-adapter-base";
 import {
   ConnectionProvider,
   WalletProvider,
@@ -12,6 +16,7 @@ import {
   SolflareWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
 import { clusterApiUrl } from "@solana/web3.js";
+import { toast } from "sonner";
 
 type WalletProviderProps = {
   children: React.ReactNode;
@@ -31,6 +36,20 @@ function getCluster() {
   return WalletAdapterNetwork.Devnet;
 }
 
+function handleWalletError(error: WalletError, adapter?: Adapter) {
+  console.error("Wallet connection failed", error, adapter);
+
+  const walletName = adapter?.name ?? "wallet";
+  const description =
+    error.name === "WalletNotReadyError"
+      ? `${walletName} is not available in this browser. Install or unlock it, then try again.`
+      : `Please approve the request in ${walletName} and try again.`;
+
+  toast.error("Wallet connection failed", {
+    description,
+  });
+}
+
 export function AppWalletProvider({ children }: WalletProviderProps) {
   const cluster = getCluster();
   const endpoint =
@@ -43,7 +62,10 @@ export function AppWalletProvider({ children }: WalletProviderProps) {
 
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider autoConnect={false} wallets={wallets}>
+      <WalletProvider
+        autoConnect={false}
+        onError={handleWalletError}
+        wallets={wallets}>
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>

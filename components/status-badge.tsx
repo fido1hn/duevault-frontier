@@ -1,5 +1,4 @@
 import { Badge } from "@/components/ui/badge";
-import type { InvoiceStatus } from "@/lib/demo-data";
 import { cn } from "@/lib/utils";
 
 const statusStyles: Record<string, string> = {
@@ -17,7 +16,7 @@ const statusStyles: Record<string, string> = {
 };
 
 type StatusBadgeProps = {
-  status: InvoiceStatus | string;
+  status: string;
   className?: string;
 };
 

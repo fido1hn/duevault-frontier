@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import { ArrowUpRight, Download, ExternalLink } from "lucide-react";
 
 import { AppLayout } from "@/components/layout/app-layout";
+import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,18 +13,26 @@ import { invoices, summaryData } from "@/lib/demo-data";
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
+  return (
+    <AppLayout>
+      <DashboardContent />
+    </AppLayout>
+  );
+}
+
+function DashboardContent() {
+  const { profile } = useMerchantProfile();
   const recentInvoices = invoices.slice(0, 5);
 
   return (
-    <AppLayout>
-      <div className="mx-auto flex max-w-7xl flex-col gap-8 p-6 md:p-8">
+    <div className="mx-auto flex max-w-7xl flex-col gap-8 p-6 md:p-8">
         <header className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
           <div>
             <h1 className="font-serif text-3xl font-semibold tracking-tight text-foreground">
               Dashboard
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Welcome back, North Pier Studio.
+              Welcome back, {profile.businessName}.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -130,7 +139,6 @@ export default function Dashboard() {
             </div>
           </div>
         </motion.section>
-      </div>
-    </AppLayout>
+    </div>
   );
 }

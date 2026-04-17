@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useDeferredValue, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowUpRight, Search } from "lucide-react";
 
@@ -10,18 +10,70 @@ import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { invoices } from "@/lib/demo-data";
+import type { SerializedInvoice } from "@/lib/invoice-types";
 import { cn } from "@/lib/utils";
 
 const filters = ["All", "Draft", "Sent", "Overdue", "Paid", "Claimed"];
 
+type InvoicesResponse = {
+  invoices?: SerializedInvoice[];
+  error?: string;
+};
+
 export default function InvoicesPage() {
   const [activeFilter, setActiveFilter] = useState("All");
   const [query, setQuery] = useState("");
+  const [invoices, setInvoices] = useState<SerializedInvoice[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadInvoices() {
+      setIsLoading(true);
+      setError("");
+
+      try {
+        const response = await fetch("/api/invoices", {
+          cache: "no-store",
+        });
+        const payload = (await response.json()) as InvoicesResponse;
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Unable to load invoices.");
+        }
+
+        if (!isCancelled) {
+          setInvoices(payload.invoices ?? []);
+        }
+      } catch (loadError) {
+        if (!isCancelled) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load invoices.",
+          );
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadInvoices();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [reloadKey]);
+
   const filteredInvoices = invoices.filter((invoice) => {
-    const matchesStatus = activeFilter === "All" || invoice.status === activeFilter;
+    const matchesStatus =
+      activeFilter === "All" || invoice.status === activeFilter;
     const matchesQuery =
       deferredQuery.length === 0 ||
       invoice.id.toLowerCase().includes(deferredQuery) ||
@@ -58,11 +110,13 @@ export default function InvoicesPage() {
                 className={cn(
                   "cursor-pointer",
                   activeFilter !== filter &&
-                    "bg-card text-muted-foreground hover:bg-muted/10"
+                    "bg-card text-muted-foreground hover:bg-muted/10",
                 )}
                 onClick={() => setActiveFilter(filter)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") setActiveFilter(filter);
+                  if (event.key === "Enter" || event.key === " ") {
+                    setActiveFilter(filter);
+                  }
                 }}
               >
                 {filter}
@@ -100,37 +154,70 @@ export default function InvoicesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-card-border">
-                {filteredInvoices.map((invoice) => (
-                  <tr
-                    key={invoice.id}
-                    className="group cursor-pointer transition-colors hover:bg-muted/5"
-                  >
-                    <td className="px-6 py-4 font-mono text-xs">{invoice.id}</td>
-                    <td className="px-6 py-4 font-medium">{invoice.client}</td>
-                    <td className="px-6 py-4 text-muted-foreground">{invoice.issued}</td>
-                    <td className="px-6 py-4 text-muted-foreground">{invoice.due}</td>
-                    <td className="px-6 py-4">{invoice.amount}</td>
-                    <td className="px-6 py-4">
-                      <StatusBadge status={invoice.status} />
+                {isLoading && (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
+                      Loading invoices...
                     </td>
-                    <td className="px-6 py-4 text-right">
+                  </tr>
+                )}
+
+                {!isLoading && error && (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center">
+                      <p className="text-sm text-destructive">{error}</p>
                       <Button
-                        asChild
-                        variant="ghost"
                         size="sm"
-                        className="h-8 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
+                        variant="outline"
+                        className="mt-4 bg-card"
+                        onClick={() => setReloadKey((key) => key + 1)}
                       >
-                        <Link href={`/invoices/${invoice.id}`}>
-                          View <ArrowUpRight className="size-3" />
-                        </Link>
+                        Try again
                       </Button>
                     </td>
                   </tr>
-                ))}
-                {filteredInvoices.length === 0 && (
+                )}
+
+                {!isLoading &&
+                  !error &&
+                  filteredInvoices.map((invoice) => (
+                    <tr
+                      key={invoice.id}
+                      className="group cursor-pointer transition-colors hover:bg-muted/5"
+                    >
+                      <td className="px-6 py-4 font-mono text-xs">{invoice.id}</td>
+                      <td className="px-6 py-4 font-medium">{invoice.client}</td>
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {invoice.issued}
+                      </td>
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {invoice.due}
+                      </td>
+                      <td className="px-6 py-4">{invoice.amount}</td>
+                      <td className="px-6 py-4">
+                        <StatusBadge status={invoice.status} />
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Button
+                          asChild
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100"
+                        >
+                          <Link href={`/invoices/${invoice.id}`}>
+                            View <ArrowUpRight className="size-3" />
+                          </Link>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+
+                {!isLoading && !error && filteredInvoices.length === 0 && (
                   <tr>
                     <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
-                      No invoices found matching the selected filter.
+                      {invoices.length === 0
+                        ? "No invoices yet. Create your first receivable."
+                        : "No invoices found matching the selected filter."}
                     </td>
                   </tr>
                 )}

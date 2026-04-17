@@ -11,6 +11,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { cn } from "@/lib/utils";
 
 const navigation = [
@@ -30,6 +31,13 @@ function isRouteActive(pathname: string, href: string) {
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { profile } = useMerchantProfile();
+  const initials = profile.businessName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase())
+    .join("");
 
   return (
     <aside className="flex w-full shrink-0 flex-col border-b border-sidebar-border bg-sidebar px-4 py-4 md:h-screen md:w-64 md:border-r md:border-b-0 md:py-6">
@@ -79,13 +87,15 @@ export function Sidebar() {
       <div className="mt-auto hidden border-t border-sidebar-border pt-4 md:block">
         <div className="flex items-center gap-3 px-3 py-2">
           <div className="flex size-8 items-center justify-center rounded-full bg-sidebar-accent text-xs font-medium">
-            NP
+            {initials || "DV"}
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-medium text-sidebar-foreground">
-              North Pier Studio
+              {profile.businessName}
             </span>
-            <span className="text-xs text-muted-foreground">Pro Tier</span>
+            <span className="max-w-36 truncate text-xs text-muted-foreground">
+              {profile.walletAddress}
+            </span>
           </div>
         </div>
       </div>

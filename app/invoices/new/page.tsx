@@ -1,11 +1,13 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion } from "motion/react";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { AppLayout } from "@/components/layout/app-layout";
+import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,22 +20,66 @@ import {
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { business, formatUsdc, type LineItem } from "@/lib/demo-data";
+import type {
+  CreateInvoiceInput,
+  InvoiceStatus,
+  PaymentRail,
+  PrivacyRail,
+  SerializedInvoice,
+} from "@/lib/invoice-types";
+
+type EditableLineItem = {
+  id: number;
+  description: string;
+  quantity: number;
+  price: number;
+};
+
+type CreateInvoiceResponse = {
+  invoice?: SerializedInvoice;
+  error?: string;
+};
+
+function formatUsdc(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 2,
+  }).format(value);
+}
 
 export default function NewInvoicePage() {
-  const [lineItems, setLineItems] = useState<LineItem[]>([
+  return (
+    <AppLayout>
+      <NewInvoiceContent />
+    </AppLayout>
+  );
+}
+
+function NewInvoiceContent() {
+  const { profile } = useMerchantProfile();
+  const router = useRouter();
+  const [clientName, setClientName] = useState("Atlas Labs");
+  const [clientEmail, setClientEmail] = useState("billing@atlaslabs.io");
+  const [invoiceNumber, setInvoiceNumber] = useState("DV-1007");
+  const [issuedAt, setIssuedAt] = useState("2026-04-01");
+  const [dueAt, setDueAt] = useState("2026-04-30");
+  const [notes, setNotes] = useState(profile.defaultNotes);
+  const [paymentRail, setPaymentRail] = useState<PaymentRail>(profile.paymentRail);
+  const [privacyRail, setPrivacyRail] = useState<PrivacyRail>(profile.privacyRail);
+  const [lineItems, setLineItems] = useState<EditableLineItem[]>([
     { id: 1, description: "Product strategy sprint", quantity: 1, price: 1600 },
     { id: 2, description: "Umbra integration advisory", quantity: 1, price: 650 },
   ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const total = lineItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
-    0
+    0,
   );
 
-  function updateLineItem(id: number, patch: Partial<LineItem>) {
+  function updateLineItem(id: number, patch: Partial<EditableLineItem>) {
     setLineItems((items) =>
-      items.map((item) => (item.id === id ? { ...item, ...patch } : item))
+      items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
     );
   }
 
@@ -48,9 +94,59 @@ export default function NewInvoicePage() {
     setLineItems((items) => items.filter((item) => item.id !== id));
   }
 
+  async function submitInvoice(status: InvoiceStatus) {
+    setIsSubmitting(true);
+    setSubmitError("");
+
+    const payload: CreateInvoiceInput = {
+      invoiceNumber,
+      clientName,
+      clientEmail,
+      issuedAt,
+      dueAt,
+      notes,
+      paymentRail,
+      privacyRail,
+      mint: "USDC",
+      status,
+      lineItems: lineItems.map((item) => ({
+        description: item.description,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+    };
+
+    try {
+      const response = await fetch("/api/invoices", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      const result = (await response.json()) as CreateInvoiceResponse;
+
+      if (!response.ok || !result.invoice) {
+        throw new Error(result.error ?? "Unable to create invoice.");
+      }
+
+      toast.success(
+        status === "Draft" ? "Invoice draft saved." : "Invoice created.",
+      );
+      router.push(`/invoices/${result.invoice.id}`);
+      router.refresh();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unable to create invoice.";
+      setSubmitError(message);
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
-    <AppLayout>
-      <div className="flex min-h-full flex-col lg:flex-row">
+    <div className="flex min-h-full flex-col lg:flex-row">
         <section className="flex-1 overflow-y-auto border-r border-border bg-card p-6 md:p-8">
           <div className="mx-auto flex max-w-2xl flex-col gap-8">
             <header>
@@ -66,12 +162,17 @@ export default function NewInvoicePage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="flex flex-col gap-2">
                   <Label>Client Name</Label>
-                  <Input defaultValue="Atlas Labs" className="bg-background" />
+                  <Input
+                    value={clientName}
+                    onChange={(event) => setClientName(event.target.value)}
+                    className="bg-background"
+                  />
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label>Client Email</Label>
                   <Input
-                    defaultValue="billing@atlaslabs.io"
+                    value={clientEmail}
+                    onChange={(event) => setClientEmail(event.target.value)}
                     type="email"
                     className="bg-background"
                   />
@@ -81,15 +182,29 @@ export default function NewInvoicePage() {
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="flex flex-col gap-2">
                   <Label>Invoice #</Label>
-                  <Input defaultValue="DV-1007" className="bg-background font-mono text-sm" />
+                  <Input
+                    value={invoiceNumber}
+                    onChange={(event) => setInvoiceNumber(event.target.value)}
+                    className="bg-background font-mono text-sm"
+                  />
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label>Issue Date</Label>
-                  <Input type="date" defaultValue="2026-04-01" className="bg-background" />
+                  <Input
+                    type="date"
+                    value={issuedAt}
+                    onChange={(event) => setIssuedAt(event.target.value)}
+                    className="bg-background"
+                  />
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label>Due Date</Label>
-                  <Input type="date" defaultValue="2026-04-30" className="bg-background" />
+                  <Input
+                    type="date"
+                    value={dueAt}
+                    onChange={(event) => setDueAt(event.target.value)}
+                    className="bg-background"
+                  />
                 </div>
               </div>
 
@@ -107,12 +222,16 @@ export default function NewInvoicePage() {
                         placeholder="Description"
                         value={item.description}
                         onChange={(event) =>
-                          updateLineItem(item.id, { description: event.target.value })
+                          updateLineItem(item.id, {
+                            description: event.target.value,
+                          })
                         }
                         className="flex-1 bg-background"
                       />
                       <Input
                         type="number"
+                        min={1}
+                        step={1}
                         value={item.quantity}
                         onChange={(event) =>
                           updateLineItem(item.id, {
@@ -123,9 +242,13 @@ export default function NewInvoicePage() {
                       />
                       <Input
                         type="number"
+                        min={0}
+                        step="0.01"
                         value={item.price}
                         onChange={(event) =>
-                          updateLineItem(item.id, { price: Number(event.target.value) })
+                          updateLineItem(item.id, {
+                            price: Number(event.target.value),
+                          })
                         }
                         className="w-32 bg-background"
                       />
@@ -157,7 +280,10 @@ export default function NewInvoicePage() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="flex flex-col gap-2">
                   <Label>Payment Rail</Label>
-                  <Select defaultValue="solana">
+                  <Select
+                    value={paymentRail}
+                    onValueChange={(value) => setPaymentRail(value as PaymentRail)}
+                  >
                     <SelectTrigger className="bg-background">
                       <SelectValue placeholder="Select network" />
                     </SelectTrigger>
@@ -171,7 +297,10 @@ export default function NewInvoicePage() {
                 </div>
                 <div className="flex flex-col gap-2">
                   <Label>Privacy Rail</Label>
-                  <Select defaultValue="umbra">
+                  <Select
+                    value={privacyRail}
+                    onValueChange={(value) => setPrivacyRail(value as PrivacyRail)}
+                  >
                     <SelectTrigger className="bg-background">
                       <SelectValue placeholder="Select privacy" />
                     </SelectTrigger>
@@ -186,21 +315,36 @@ export default function NewInvoicePage() {
               <div className="flex flex-col gap-2">
                 <Label>Notes</Label>
                 <Textarea
-                  defaultValue="Thank you for your business. Payment is expected within 30 days."
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
                   className="resize-none bg-background"
                   rows={3}
                 />
               </div>
             </div>
 
+            {submitError && (
+              <div className="rounded-md border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                {submitError}
+              </div>
+            )}
+
             <div className="flex gap-3 pt-6">
-              <Button variant="outline" className="flex-1">
-                Save Draft
+              <Button
+                variant="outline"
+                className="flex-1"
+                disabled={isSubmitting}
+                onClick={() => void submitInvoice("Draft")}
+              >
+                {isSubmitting ? "Saving..." : "Save Draft"}
               </Button>
-              <Button asChild className="flex-1">
-                <Link href="/invoices/DV-1007">
-                  Create Invoice <ArrowRight className="size-4" />
-                </Link>
+              <Button
+                className="flex-1"
+                disabled={isSubmitting}
+                onClick={() => void submitInvoice("Sent")}
+              >
+                {isSubmitting ? "Creating..." : "Create Invoice"}
+                <ArrowRight className="size-4" />
               </Button>
             </div>
           </div>
@@ -222,15 +366,17 @@ export default function NewInvoicePage() {
                 <div className="flex items-start justify-between">
                   <div>
                     <h2 className="font-serif text-xl font-bold text-primary">
-                      {business.name}
+                      {profile.businessName}
                     </h2>
-                    <p className="mt-1 text-xs text-muted-foreground">{business.email}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {profile.contactEmail}
+                    </p>
                   </div>
                   <div className="text-right">
                     <h3 className="text-sm font-medium tracking-widest text-muted-foreground uppercase">
                       Invoice
                     </h3>
-                    <p className="mt-1 font-mono text-sm">DV-1007</p>
+                    <p className="mt-1 font-mono text-sm">{invoiceNumber || "DV-0000"}</p>
                   </div>
                 </div>
 
@@ -239,15 +385,17 @@ export default function NewInvoicePage() {
                     <p className="mb-1 text-xs tracking-wider text-muted-foreground uppercase">
                       Billed To
                     </p>
-                    <p className="font-medium">Atlas Labs</p>
-                    <p className="text-muted-foreground">billing@atlaslabs.io</p>
+                    <p className="font-medium">{clientName || "Client name"}</p>
+                    <p className="text-muted-foreground">
+                      {clientEmail || "client@example.com"}
+                    </p>
                   </div>
                   <div className="text-right">
                     <p className="mb-1 text-xs tracking-wider text-muted-foreground uppercase">
                       Details
                     </p>
-                    <p>Issued: Apr 01, 2026</p>
-                    <p className="mt-0.5 font-medium">Due: Apr 30, 2026</p>
+                    <p>Issued: {issuedAt || "YYYY-MM-DD"}</p>
+                    <p className="mt-0.5 font-medium">Due: {dueAt || "YYYY-MM-DD"}</p>
                   </div>
                 </div>
 
@@ -264,11 +412,13 @@ export default function NewInvoicePage() {
                     <tbody className="divide-y divide-border/30">
                       {lineItems.map((item) => (
                         <tr key={item.id}>
-                          <td className="py-3">{item.description || "Item description"}</td>
+                          <td className="py-3">
+                            {item.description || "Item description"}
+                          </td>
                           <td className="py-3 text-right">{item.quantity}</td>
                           <td className="py-3 text-right">{formatUsdc(item.price)}</td>
                           <td className="py-3 text-right font-medium">
-                            {formatUsdc(item.quantity * item.price)}
+                            {formatUsdc(item.quantity * item.price)} USDC
                           </td>
                         </tr>
                       ))}
@@ -305,7 +455,7 @@ export default function NewInvoicePage() {
                       Notes
                     </p>
                     <p className="text-sm text-muted-foreground italic">
-                      Thank you for your business. Payment is expected within 30 days.
+                      {notes || "Optional invoice note."}
                     </p>
                   </div>
                 </div>
@@ -313,7 +463,6 @@ export default function NewInvoicePage() {
             </motion.div>
           </div>
         </aside>
-      </div>
-    </AppLayout>
+    </div>
   );
 }
