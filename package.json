@@ -10,6 +10,8 @@
     "start": "next start",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:deploy:prod": "set -a; . ./.env.production; set +a; prisma migrate deploy",
+    "db:status:prod": "set -a; . ./.env.production; set +a; prisma migrate status",
     "db:studio": "prisma studio"
   },
   "dependencies": {

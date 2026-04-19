@@ -4,6 +4,7 @@ dist
 generated
 .env
 .env.local
+.env.production
 dev.db
 dev.db-journal
 prisma/dev.db
