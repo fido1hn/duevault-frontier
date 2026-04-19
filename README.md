@@ -8,7 +8,7 @@ This repository is currently on **step 1 foundation**:
 
 - Next.js App Router skeleton
 - Solana wallet provider shell
-- Prisma + SQLite for off-chain payment-request records
+- Prisma + Supabase Postgres for off-chain receivables records
 - minimal merchant pages and payment-request API routes
 - Umbra SDK kept behind a clean app-facing service boundary
 
@@ -38,7 +38,7 @@ Install dependencies:
 bun install
 ```
 
-Create or update the local SQLite schema:
+Create or update the Supabase Postgres schema from Prisma:
 
 ```bash
 bun run db:migrate
@@ -62,17 +62,19 @@ Copy `.env.example` to `.env` if needed.
 
 The default local setup uses:
 
-- SQLite for off-chain records
+- Supabase Postgres for off-chain records
 - Solana devnet RPC
 
 ## Project structure
 
 - `app/`: Next.js pages and route handlers
 - `components/`: UI building blocks and wallet providers
-- `lib/payment-intents.ts`: payment-request domain logic
-- `lib/db.ts`: Prisma client singleton
+- `features/`: vertical feature slices for invoices, merchant profiles, payment intents, waitlist, and checkout
+- `server/db.ts`: server-only Prisma client singleton
+- `fixtures/`: demo data used by prototype-only screens
+- `lib/`: shared utilities, formatting, and brand constants
 - `lib/umbra/`: Umbra boundary, placeholders, and future SDK integration
-- `prisma/schema.prisma`: local DB schema
+- `prisma/schema.prisma`: Prisma source of truth for app tables
 
 ## References
 

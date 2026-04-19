@@ -5,19 +5,11 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { joinWaitlistClient } from "@/features/waitlist/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import type {
-  SerializedWaitlistSignup,
-  WaitlistSignupInput,
-} from "@/lib/waitlist-types";
-
-type WaitlistResponse = {
-  signup?: SerializedWaitlistSignup;
-  alreadyJoined?: boolean;
-  error?: string;
-};
+import type { WaitlistSignupInput } from "@/features/waitlist/types";
 
 type WaitlistFormProps = {
   source?: string;
@@ -66,18 +58,7 @@ export function WaitlistForm({ source = "homepage" }: WaitlistFormProps) {
     };
 
     try {
-      const response = await fetch("/api/waitlist", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-      const result = (await response.json()) as WaitlistResponse;
-
-      if (!response.ok || !result.signup) {
-        throw new Error(result.error ?? "Unable to join the waitlist.");
-      }
+      const result = await joinWaitlistClient(payload);
 
       const message = result.alreadyJoined
         ? "You are already on the DueVault waitlist."

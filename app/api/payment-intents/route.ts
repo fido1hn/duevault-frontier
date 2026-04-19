@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   createPaymentIntent,
   listPaymentIntents,
-  type CreatePaymentIntentInput,
-} from "@/lib/payment-intents";
+} from "@/features/payment-intents/service";
+import type { CreatePaymentIntentInput } from "@/features/payment-intents/types";
 
 export async function GET() {
   const intents = await listPaymentIntents();

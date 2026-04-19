@@ -2,10 +2,11 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { updatePaymentIntentClient } from "@/features/payment-intents/client";
 import type {
   PaymentIntentStatus,
   SerializedPaymentIntent,
-} from "@/lib/payment-intents";
+} from "@/features/payment-intents/types";
 
 type PaymentIntentActionsProps = {
   intent: SerializedPaymentIntent;
@@ -23,20 +24,7 @@ export function PaymentIntentActions({
     setIsPending(true);
 
     try {
-      const response = await fetch(`/api/payment-intents/${intent.id}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ status }),
-      });
-
-      const payload = (await response.json()) as { error?: string };
-
-      if (!response.ok) {
-        throw new Error(payload.error ?? "Unable to update payment request.");
-      }
-
+      await updatePaymentIntentClient(intent.id, { status });
       router.refresh();
     } catch (updateError) {
       setError(

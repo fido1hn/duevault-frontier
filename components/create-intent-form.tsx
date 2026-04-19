@@ -3,15 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
-import type { SerializedPaymentIntent } from "@/lib/payment-intents";
-
-type CreateIntentResponse = {
-  intent: SerializedPaymentIntent;
-};
-
-type CreateIntentErrorResponse = {
-  error?: string;
-};
+import { createPaymentIntentClient } from "@/features/payment-intents/client";
 
 export function CreateIntentForm() {
   const router = useRouter();
@@ -29,38 +21,16 @@ export function CreateIntentForm() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch("/api/payment-intents", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          merchantWallet: publicKey?.toBase58() ?? "demo-merchant-wallet",
-          amountAtomic,
-          mint: "USDC",
-          note,
-          customerLabel,
-          expiresAt: expiresAt || null,
-        }),
+      const intent = await createPaymentIntentClient({
+        merchantWallet: publicKey?.toBase58() ?? "demo-merchant-wallet",
+        amountAtomic,
+        mint: "USDC",
+        note,
+        customerLabel,
+        expiresAt: expiresAt || null,
       });
 
-      const payload = (await response.json()) as
-        | CreateIntentResponse
-        | CreateIntentErrorResponse;
-
-      if (!response.ok) {
-        const message =
-          "error" in payload && typeof payload.error === "string"
-            ? payload.error
-            : "Unable to create payment request.";
-        throw new Error(message);
-      }
-
-      if (!("intent" in payload)) {
-        throw new Error("Unable to create payment request.");
-      }
-
-      router.push(`/pay/${payload.intent.id}`);
+      router.push(`/pay/${intent.id}`);
       router.refresh();
     } catch (submissionError) {
       setError(

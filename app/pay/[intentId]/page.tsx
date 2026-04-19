@@ -6,10 +6,12 @@ import {
   type CheckoutPaymentSource,
   type CheckoutPaymentLineItem,
   type CheckoutPaymentViewModel,
-} from "@/lib/checkout-payment";
-import { business, formatUsdc, getInvoiceById } from "@/lib/demo-data";
-import { getInvoiceByNumber } from "@/lib/invoices";
-import type { SerializedInvoice } from "@/lib/invoice-types";
+} from "@/features/checkout/service";
+import { business, formatUsdc, getInvoiceById } from "@/fixtures/demo-data";
+import { getInvoiceByNumber } from "@/features/invoices/service";
+import type { SerializedInvoice } from "@/features/invoices/types";
+
+export const dynamic = "force-dynamic";
 
 type PayPageProps = {
   params: Promise<{

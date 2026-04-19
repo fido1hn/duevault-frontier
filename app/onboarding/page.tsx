@@ -10,6 +10,10 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  getMerchantProfileByWalletClient,
+  upsertMerchantProfileClient,
+} from "@/features/merchant-profiles/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,17 +24,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import type { PaymentRail, PrivacyRail } from "@/lib/invoice-types";
-import {
-  DEFAULT_PROFILE_NOTES,
-  type SerializedMerchantProfile,
-  type UpsertMerchantProfileInput,
-} from "@/lib/merchant-profile-types";
-
-type ProfileResponse = {
-  profile?: SerializedMerchantProfile | null;
-  error?: string;
-};
+import type { PaymentRail, PrivacyRail } from "@/features/invoices/types";
+import { DEFAULT_PROFILE_NOTES } from "@/features/merchant-profiles/constants";
+import type { UpsertMerchantProfileInput } from "@/features/merchant-profiles/types";
 
 function getSafeNext(value: string | null) {
   if (value && value.startsWith("/") && !value.startsWith("//")) {
@@ -67,25 +63,15 @@ function OnboardingContent() {
       setError("");
 
       try {
-        const response = await fetch(
-          `/api/merchant-profile?walletAddress=${encodeURIComponent(walletAddress)}`,
-          {
-            cache: "no-store",
-          },
-        );
-        const payload = (await response.json()) as ProfileResponse;
+        const profile = await getMerchantProfileByWalletClient(walletAddress);
 
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Unable to load merchant profile.");
-        }
-
-        if (!isCancelled && payload.profile) {
-          setBusinessName(payload.profile.businessName);
-          setContactEmail(payload.profile.contactEmail);
-          setBusinessAddress(payload.profile.businessAddress);
-          setDefaultNotes(payload.profile.defaultNotes);
-          setPaymentRail(payload.profile.paymentRail);
-          setPrivacyRail(payload.profile.privacyRail);
+        if (!isCancelled && profile) {
+          setBusinessName(profile.businessName);
+          setContactEmail(profile.contactEmail);
+          setBusinessAddress(profile.businessAddress);
+          setDefaultNotes(profile.defaultNotes);
+          setPaymentRail(profile.paymentRail);
+          setPrivacyRail(profile.privacyRail);
         }
       } catch (loadError) {
         if (!isCancelled) {
@@ -130,19 +116,7 @@ function OnboardingContent() {
     };
 
     try {
-      const response = await fetch("/api/merchant-profile", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-      const result = (await response.json()) as ProfileResponse;
-
-      if (!response.ok || !result.profile) {
-        throw new Error(result.error ?? "Unable to save company profile.");
-      }
-
+      await upsertMerchantProfileClient(payload);
       toast.success("Company profile saved.");
       router.push(nextPath);
       router.refresh();

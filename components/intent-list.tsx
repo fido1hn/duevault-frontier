@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { SerializedPaymentIntent } from "@/lib/payment-intents";
+import type { SerializedPaymentIntent } from "@/features/payment-intents/types";
 import { formatAtomicAmount, formatDateTime } from "@/lib/format";
 
 type IntentListProps = {

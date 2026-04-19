@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { createInvoice, listInvoices } from "@/lib/invoices";
-import type { CreateInvoiceInput } from "@/lib/invoice-types";
+import { createInvoice, listInvoices } from "@/features/invoices/service";
+import type { CreateInvoiceInput } from "@/features/invoices/types";
 
 export async function GET() {
   const invoices = await listInvoices();

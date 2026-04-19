@@ -3,8 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getMerchantProfileByWallet,
   upsertMerchantProfile,
-} from "@/lib/merchant-profiles";
-import type { UpsertMerchantProfileInput } from "@/lib/merchant-profile-types";
+} from "@/features/merchant-profiles/service";
+import type { UpsertMerchantProfileInput } from "@/features/merchant-profiles/types";
 
 export async function GET(request: NextRequest) {
   try {

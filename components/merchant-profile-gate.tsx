@@ -13,13 +13,9 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { Building2, Loader2, Wallet } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { getMerchantProfileByWalletClient } from "@/features/merchant-profiles/client";
 import { useWalletConnectionRequest } from "@/hooks/use-wallet-connection-request";
-import type { SerializedMerchantProfile } from "@/lib/merchant-profile-types";
-
-type ProfileResponse = {
-  profile?: SerializedMerchantProfile | null;
-  error?: string;
-};
+import type { SerializedMerchantProfile } from "@/features/merchant-profiles/types";
 
 type MerchantProfileContextValue = {
   profile: SerializedMerchantProfile;
@@ -96,22 +92,13 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
       setError("");
 
       try {
-        const response = await fetch(
-          `/api/merchant-profile?walletAddress=${encodeURIComponent(walletAddress)}`,
-          {
-            cache: "no-store",
-          },
-        );
-        const payload = (await response.json()) as ProfileResponse;
-
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Unable to load merchant profile.");
-        }
+        const loadedProfile =
+          await getMerchantProfileByWalletClient(walletAddress);
 
         if (isCancelled) return;
 
-        if (payload.profile) {
-          setProfile(payload.profile);
+        if (loadedProfile) {
+          setProfile(loadedProfile);
           setStatus("ready");
           return;
         }

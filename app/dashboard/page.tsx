@@ -9,7 +9,7 @@ import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { invoices, summaryData } from "@/lib/demo-data";
+import { invoices, summaryData } from "@/fixtures/demo-data";
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {

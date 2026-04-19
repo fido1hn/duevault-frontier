@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { activityLog } from "@/lib/demo-data";
+import { activityLog } from "@/fixtures/demo-data";
 
 export default function ActivityPage() {
   return (

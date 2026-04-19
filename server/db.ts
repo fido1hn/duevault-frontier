@@ -1,5 +1,7 @@
-import { PrismaLibSql } from "@prisma/adapter-libsql";
-import { PrismaClient } from "@prisma/client";
+import "server-only";
+
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "@/generated/prisma/client";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -12,8 +14,8 @@ if (!databaseUrl) {
   throw new Error("DATABASE_URL is required to initialize Prisma.");
 }
 
-const adapter = new PrismaLibSql({
-  url: databaseUrl,
+const adapter = new PrismaPg({
+  connectionString: databaseUrl,
 });
 
 export const db =

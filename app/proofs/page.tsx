@@ -12,7 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { primaryInvoice, recentProofs } from "@/lib/demo-data";
+import { primaryInvoice, recentProofs } from "@/fixtures/demo-data";
 
 export default function ProofsPage() {
   const [email, setEmail] = useState("accountant@northpier.studio");

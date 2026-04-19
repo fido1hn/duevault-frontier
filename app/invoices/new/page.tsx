@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { Button } from "@/components/ui/button";
+import { createInvoiceClient } from "@/features/invoices/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -25,19 +26,13 @@ import type {
   InvoiceStatus,
   PaymentRail,
   PrivacyRail,
-  SerializedInvoice,
-} from "@/lib/invoice-types";
+} from "@/features/invoices/types";
 
 type EditableLineItem = {
   id: number;
   description: string;
   quantity: number;
   price: number;
-};
-
-type CreateInvoiceResponse = {
-  invoice?: SerializedInvoice;
-  error?: string;
 };
 
 function formatUsdc(value: number) {
@@ -117,23 +112,12 @@ function NewInvoiceContent() {
     };
 
     try {
-      const response = await fetch("/api/invoices", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-      const result = (await response.json()) as CreateInvoiceResponse;
-
-      if (!response.ok || !result.invoice) {
-        throw new Error(result.error ?? "Unable to create invoice.");
-      }
+      const invoice = await createInvoiceClient(payload);
 
       toast.success(
         status === "Draft" ? "Invoice draft saved." : "Invoice created.",
       );
-      router.push(`/invoices/${result.invoice.id}`);
+      router.push(`/invoices/${invoice.id}`);
       router.refresh();
     } catch (error) {
       const message =

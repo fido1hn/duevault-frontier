@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getInvoiceByNumber } from "@/lib/invoices";
+import { getInvoiceByNumber } from "@/features/invoices/service";
 
 type InvoiceRouteProps = {
   params: Promise<{

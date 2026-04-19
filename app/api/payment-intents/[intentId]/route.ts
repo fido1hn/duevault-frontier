@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   getPaymentIntentById,
   updatePaymentIntent,
-  type UpdatePaymentIntentInput,
-} from "@/lib/payment-intents";
+} from "@/features/payment-intents/service";
+import type { UpdatePaymentIntentInput } from "@/features/payment-intents/types";
 
 type PaymentIntentRouteProps = {
   params: Promise<{

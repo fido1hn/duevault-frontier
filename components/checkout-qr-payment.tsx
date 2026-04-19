@@ -23,8 +23,8 @@ import {
   mapCheckoutPaymentStatus,
   type CheckoutPaymentStatus,
   type CheckoutPaymentViewModel,
-} from "@/lib/checkout-payment";
-import type { SerializedInvoice } from "@/lib/invoice-types";
+} from "@/features/checkout/service";
+import type { SerializedInvoice } from "@/features/invoices/types";
 
 type CheckoutQrPaymentProps = {
   checkout: CheckoutPaymentViewModel;

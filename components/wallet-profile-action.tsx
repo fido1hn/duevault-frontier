@@ -6,13 +6,8 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { getMerchantProfileByWalletClient } from "@/features/merchant-profiles/client";
 import { useWalletConnectionRequest } from "@/hooks/use-wallet-connection-request";
-import type { SerializedMerchantProfile } from "@/lib/merchant-profile-types";
-
-type ProfileResponse = {
-  profile?: SerializedMerchantProfile | null;
-  error?: string;
-};
 
 type WalletProfileActionProps = Omit<ComponentProps<typeof Button>, "onClick"> & {
   destination: string;
@@ -46,19 +41,9 @@ export function WalletProfileAction({
       setIsChecking(true);
 
       try {
-        const response = await fetch(
-          `/api/merchant-profile?walletAddress=${encodeURIComponent(walletAddress)}`,
-          {
-            cache: "no-store",
-          },
-        );
-        const payload = (await response.json()) as ProfileResponse;
+        const profile = await getMerchantProfileByWalletClient(walletAddress);
 
-        if (!response.ok) {
-          throw new Error(payload.error ?? "Unable to check merchant profile.");
-        }
-
-        router.push(payload.profile ? target : buildOnboardingPath(target));
+        router.push(profile ? target : buildOnboardingPath(target));
       } catch {
         router.push(buildOnboardingPath(target));
       } finally {

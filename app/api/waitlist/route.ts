@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { joinWaitlist } from "@/lib/waitlist";
-import type { WaitlistSignupInput } from "@/lib/waitlist-types";
+import { joinWaitlist } from "@/features/waitlist/service";
+import type { WaitlistSignupInput } from "@/features/waitlist/types";
 
 export async function POST(request: NextRequest) {
   try {

@@ -1,23 +1,13 @@
-export const INVOICE_STATUSES = [
-  "Draft",
-  "Sent",
-  "Viewed",
-  "Paid",
-  "Detected",
-  "Claimed",
-  "Settled",
-  "Overdue",
-] as const;
+import type {
+  INVOICE_MINTS,
+  INVOICE_STATUSES,
+  PAYMENT_RAILS,
+  PRIVACY_RAILS,
+} from "@/features/invoices/constants";
 
 export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
-
-export const PAYMENT_RAILS = ["solana"] as const;
 export type PaymentRail = (typeof PAYMENT_RAILS)[number];
-
-export const PRIVACY_RAILS = ["umbra", "none"] as const;
 export type PrivacyRail = (typeof PRIVACY_RAILS)[number];
-
-export const INVOICE_MINTS = ["USDC"] as const;
 export type InvoiceMint = (typeof INVOICE_MINTS)[number];
 
 export type SerializedInvoiceLineItem = {
@@ -75,4 +65,11 @@ export type CreateInvoiceInput = {
   mint?: InvoiceMint;
   status?: InvoiceStatus;
   lineItems: CreateInvoiceLineItemInput[];
+};
+
+export type InvoiceLineItemCreateData = {
+  description: string;
+  quantity: number;
+  unitAmountAtomic: string;
+  sortOrder: number;
 };

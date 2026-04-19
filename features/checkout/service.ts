@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import type { InvoiceStatus } from "@/lib/invoice-types";
+import type { InvoiceStatus } from "@/features/invoices/types";
 
 export type CheckoutPaymentLineItem = {
   id: string;

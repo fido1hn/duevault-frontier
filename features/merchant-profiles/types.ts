@@ -1,7 +1,8 @@
-import type { InvoiceMint, PaymentRail, PrivacyRail } from "@/lib/invoice-types";
-
-export const DEFAULT_PROFILE_NOTES =
-  "Thank you for your business. Payment is expected within 30 days.";
+import type {
+  InvoiceMint,
+  PaymentRail,
+  PrivacyRail,
+} from "@/features/invoices/types";
 
 export type SerializedMerchantProfile = {
   id: string;

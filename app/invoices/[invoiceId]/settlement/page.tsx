@@ -16,7 +16,7 @@ import {
 import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { business, getInvoiceById } from "@/lib/demo-data";
+import { business, getInvoiceById } from "@/fixtures/demo-data";
 
 export default function SettlementPage() {
   const params = useParams<{ invoiceId: string }>();
