@@ -1,17 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
-import { ArrowRight, Building2, Loader2, Wallet } from "lucide-react";
+import { usePrivy } from "@privy-io/react-auth";
+import { ArrowRight, Building2, Loader2, LogIn, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  getMerchantProfileByWalletClient,
+  getLinkedSolanaWallets,
+  SOLANA_WALLET_LIST,
+} from "@/features/auth/privy-wallets";
+import { getSafeNextPath } from "@/features/auth/routing";
+import {
+  getMerchantProfileClient,
   upsertMerchantProfileClient,
 } from "@/features/merchant-profiles/client";
 import { Input } from "@/components/ui/input";
@@ -28,20 +32,14 @@ import type { PaymentRail, PrivacyRail } from "@/features/invoices/types";
 import { DEFAULT_PROFILE_NOTES } from "@/features/merchant-profiles/constants";
 import type { UpsertMerchantProfileInput } from "@/features/merchant-profiles/types";
 
-function getSafeNext(value: string | null) {
-  if (value && value.startsWith("/") && !value.startsWith("//")) {
-    return value;
-  }
-
-  return "/dashboard";
-}
-
 function OnboardingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { publicKey } = useWallet();
-  const { setVisible } = useWalletModal();
-  const nextPath = getSafeNext(searchParams.get("next"));
+  const { authenticated, getAccessToken, linkWallet, login, ready, user } =
+    usePrivy();
+  const nextPath = getSafeNextPath(searchParams.get("next"));
+  const solanaWallets = useMemo(() => getLinkedSolanaWallets(user), [user]);
+  const walletAddress = solanaWallets[0]?.address ?? null;
   const [businessName, setBusinessName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [businessAddress, setBusinessAddress] = useState("");
@@ -49,38 +47,35 @@ function OnboardingContent() {
   const [paymentRail, setPaymentRail] = useState<PaymentRail>("solana");
   const [privacyRail, setPrivacyRail] = useState<PrivacyRail>("umbra");
   const [isLoadingProfile, setIsLoadingProfile] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!publicKey) return;
+    if (!ready || !authenticated) {
+      setIsLoadingProfile(false);
+      setIsRedirecting(false);
+      setError("");
+      return;
+    }
 
     let isCancelled = false;
-    const walletAddress = publicKey.toBase58();
 
     async function loadProfile() {
       setIsLoadingProfile(true);
+      setIsRedirecting(false);
       setError("");
 
       try {
-        const profile = await getMerchantProfileByWalletClient(walletAddress);
+        const profile = await getMerchantProfileClient(getAccessToken);
 
         if (!isCancelled && profile) {
-          setBusinessName(profile.businessName);
-          setContactEmail(profile.contactEmail);
-          setBusinessAddress(profile.businessAddress);
-          setDefaultNotes(profile.defaultNotes);
-          setPaymentRail(profile.paymentRail);
-          setPrivacyRail(profile.privacyRail);
+          setIsRedirecting(true);
+          router.replace(nextPath);
+          return;
         }
-      } catch (loadError) {
-        if (!isCancelled) {
-          setError(
-            loadError instanceof Error
-              ? loadError.message
-              : "Unable to load merchant profile.",
-          );
-        }
+      } catch {
+        // Onboarding is the safe fallback if the profile check cannot finish.
       } finally {
         if (!isCancelled) {
           setIsLoadingProfile(false);
@@ -93,11 +88,22 @@ function OnboardingContent() {
     return () => {
       isCancelled = true;
     };
-  }, [publicKey]);
+  }, [authenticated, getAccessToken, nextPath, ready, router]);
 
   async function handleSubmit() {
-    if (!publicKey) {
-      setVisible(true);
+    if (!authenticated) {
+      login({
+        loginMethods: ["wallet", "email"],
+        walletChainType: "solana-only",
+      });
+      return;
+    }
+
+    if (!walletAddress) {
+      linkWallet({
+        walletChainType: "solana-only",
+        walletList: SOLANA_WALLET_LIST,
+      });
       return;
     }
 
@@ -105,7 +111,7 @@ function OnboardingContent() {
     setError("");
 
     const payload: UpsertMerchantProfileInput = {
-      walletAddress: publicKey.toBase58(),
+      primaryWalletAddress: walletAddress,
       businessName,
       contactEmail,
       businessAddress,
@@ -116,7 +122,7 @@ function OnboardingContent() {
     };
 
     try {
-      await upsertMerchantProfileClient(payload);
+      await upsertMerchantProfileClient(payload, getAccessToken);
       toast.success("Company profile saved.");
       router.push(nextPath);
       router.refresh();
@@ -132,7 +138,75 @@ function OnboardingContent() {
     }
   }
 
-  if (!publicKey) {
+  if (!ready) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </main>
+    );
+  }
+
+  if (!authenticated) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-6 py-12">
+        <Card className="w-full max-w-md border-card-border text-center shadow-xl shadow-primary/5">
+          <CardHeader>
+            <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <LogIn className="size-5" />
+            </div>
+            <CardTitle className="font-serif text-2xl">
+              Sign in to set up DueVault
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Use email or a Solana wallet to create your merchant workspace.
+            </p>
+            <Button
+              className="mt-6 w-full"
+              onClick={() =>
+                login({
+                  loginMethods: ["wallet", "email"],
+                  walletChainType: "solana-only",
+                })
+              }
+            >
+              Sign in
+            </Button>
+            <Button asChild variant="link" className="mt-2">
+              <Link href="/">Back to homepage</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+
+  if (isLoadingProfile || isRedirecting) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background px-6 py-12">
+        <Card className="w-full max-w-md border-card-border text-center shadow-xl shadow-primary/5">
+          <CardHeader>
+            <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Loader2 className="size-5 animate-spin" />
+            </div>
+            <CardTitle className="font-serif text-2xl">
+              {isRedirecting ? "Opening workspace" : "Checking workspace"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {isRedirecting
+                ? "Your company profile is ready."
+                : "Looking for an existing company profile."}
+            </p>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
+
+  if (!walletAddress) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background px-6 py-12">
         <Card className="w-full max-w-md border-card-border text-center shadow-xl shadow-primary/5">
@@ -141,19 +215,24 @@ function OnboardingContent() {
               <Wallet className="size-5" />
             </div>
             <CardTitle className="font-serif text-2xl">
-              Connect wallet to set up DueVault
+              Connect a Solana wallet
             </CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm leading-relaxed text-muted-foreground">
-              We use your Solana wallet as your local merchant identity for this
-              hackathon prototype.
+              DueVault stores merchant records under your Privy account and a
+              verified external Solana wallet.
             </p>
-            <Button className="mt-6 w-full" onClick={() => setVisible(true)}>
-              Connect Wallet
-            </Button>
-            <Button asChild variant="link" className="mt-2">
-              <Link href="/">Back to homepage</Link>
+            <Button
+              className="mt-6 w-full"
+              onClick={() =>
+                linkWallet({
+                  walletChainType: "solana-only",
+                  walletList: SOLANA_WALLET_LIST,
+                })
+              }
+            >
+              Connect Solana Wallet
             </Button>
           </CardContent>
         </Card>
@@ -177,7 +256,7 @@ function OnboardingContent() {
             </div>
           </Link>
           <p className="hidden max-w-xs text-right font-mono text-xs text-muted-foreground md:block">
-            {publicKey.toBase58()}
+            {walletAddress}
           </p>
         </header>
 
@@ -194,9 +273,9 @@ function OnboardingContent() {
               checkout experience. You can refine them later in settings.
             </p>
             <div className="mt-8 rounded-lg border border-primary/10 bg-primary/5 p-4 text-sm">
-              <p className="font-medium text-primary">Wallet identity</p>
+              <p className="font-medium text-primary">Linked Solana wallet</p>
               <p className="mt-2 break-all font-mono text-xs text-muted-foreground">
-                {publicKey.toBase58()}
+                {walletAddress}
               </p>
             </div>
           </div>
@@ -289,7 +368,7 @@ function OnboardingContent() {
                 <Label>Solana Wallet</Label>
                 <Input
                   readOnly
-                  value={publicKey.toBase58()}
+                  value={walletAddress}
                   className="font-mono text-xs text-muted-foreground"
                 />
               </div>

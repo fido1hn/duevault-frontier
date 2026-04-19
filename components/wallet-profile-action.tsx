@@ -1,21 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ComponentProps } from "react";
+import { useState, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useLogin, usePrivy } from "@privy-io/react-auth";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { getMerchantProfileByWalletClient } from "@/features/merchant-profiles/client";
-import { useWalletConnectionRequest } from "@/hooks/use-wallet-connection-request";
+import {
+  getLinkedSolanaWallets,
+  SOLANA_WALLET_LIST,
+} from "@/features/auth/privy-wallets";
+import { resolvePostAuthPath } from "@/features/auth/routing";
 
 type WalletProfileActionProps = Omit<ComponentProps<typeof Button>, "onClick"> & {
   destination: string;
 };
-
-function buildOnboardingPath(destination: string) {
-  return `/onboarding?next=${encodeURIComponent(destination)}`;
-}
 
 export function WalletProfileAction({
   destination,
@@ -24,63 +23,58 @@ export function WalletProfileAction({
   ...buttonProps
 }: WalletProfileActionProps) {
   const router = useRouter();
-  const { publicKey } = useWallet();
-  const [pendingDestination, setPendingDestination] = useState<string | null>(null);
+  const { authenticated, getAccessToken, linkWallet, ready, user } = usePrivy();
   const [isChecking, setIsChecking] = useState(false);
-  const clearPendingDestination = useCallback(() => {
-    setPendingDestination(null);
-  }, []);
-  const { isConnectingWallet, requestWalletConnection } =
-    useWalletConnectionRequest({
-      onCancel: clearPendingDestination,
-      onError: clearPendingDestination,
-    });
+  const hasSolanaWallet = getLinkedSolanaWallets(user).length > 0;
 
-  const routeForWallet = useCallback(
-    async (walletAddress: string, target: string) => {
-      setIsChecking(true);
+  async function routeAfterAuth(target: string) {
+    setIsChecking(true);
 
-      try {
-        const profile = await getMerchantProfileByWalletClient(walletAddress);
+    try {
+      const nextPath = await resolvePostAuthPath(target, getAccessToken);
 
-        router.push(profile ? target : buildOnboardingPath(target));
-      } catch {
-        router.push(buildOnboardingPath(target));
-      } finally {
-        setIsChecking(false);
-      }
+      router.push(nextPath);
+    } finally {
+      setIsChecking(false);
+    }
+  }
+
+  const { login } = useLogin({
+    onComplete: () => {
+      void routeAfterAuth(destination);
     },
-    [router],
-  );
-
-  useEffect(() => {
-    if (!pendingDestination || !publicKey) return;
-
-    const target = pendingDestination;
-    setPendingDestination(null);
-    void routeForWallet(publicKey.toBase58(), target);
-  }, [pendingDestination, publicKey, routeForWallet]);
+  });
 
   function handleClick() {
-    if (!publicKey) {
-      setPendingDestination(destination);
-      requestWalletConnection();
+    if (!ready) return;
+
+    if (!authenticated) {
+      login({
+        loginMethods: ["wallet", "email"],
+        walletChainType: "solana-only",
+      });
       return;
     }
 
-    void routeForWallet(publicKey.toBase58(), destination);
+    if (!hasSolanaWallet) {
+      linkWallet({
+        walletChainType: "solana-only",
+        walletList: SOLANA_WALLET_LIST,
+      });
+      return;
+    }
+
+    void routeAfterAuth(destination);
   }
 
   return (
     <Button
       type="button"
-      disabled={disabled || isChecking || isConnectingWallet}
+      disabled={disabled || !ready || isChecking}
       onClick={handleClick}
       {...buttonProps}
     >
-      {(isChecking || isConnectingWallet) && (
-        <Loader2 className="size-4 animate-spin" />
-      )}
+      {isChecking && <Loader2 className="size-4 animate-spin" />}
       {children}
     </Button>
   );

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useDeferredValue, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowUpRight, Search } from "lucide-react";
+import { usePrivy } from "@privy-io/react-auth";
 
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -16,27 +17,28 @@ import { cn } from "@/lib/utils";
 const filters = ["All", "Draft", "Sent", "Overdue", "Paid", "Claimed"];
 
 type InvoicesClientProps = {
-  initialInvoices: SerializedInvoice[];
+  initialInvoices?: SerializedInvoice[];
   initialError?: string;
 };
 
 export function InvoicesClient({
-  initialInvoices,
+  initialInvoices = [],
   initialError = "",
 }: InvoicesClientProps) {
+  const { getAccessToken } = usePrivy();
   const [activeFilter, setActiveFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [invoices, setInvoices] = useState(initialInvoices);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(initialInvoices.length === 0);
   const [error, setError] = useState(initialError);
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
 
-  async function reloadInvoices() {
+  const reloadInvoices = useCallback(async function reloadInvoices() {
     setIsLoading(true);
     setError("");
 
     try {
-      setInvoices(await listInvoicesClient());
+      setInvoices(await listInvoicesClient(getAccessToken));
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -46,7 +48,11 @@ export function InvoicesClient({
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [getAccessToken]);
+
+  useEffect(() => {
+    void reloadInvoices();
+  }, [reloadInvoices]);
 
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesStatus =

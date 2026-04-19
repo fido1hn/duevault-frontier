@@ -26,6 +26,10 @@ export type SerializedInvoiceLineItem = {
 export type SerializedInvoice = {
   id: string;
   invoiceId: string;
+  publicId: string;
+  merchantProfileId: string;
+  merchantName: string;
+  merchantWalletAddress: string;
   invoiceNumber: string;
   client: string;
   clientEmail: string;

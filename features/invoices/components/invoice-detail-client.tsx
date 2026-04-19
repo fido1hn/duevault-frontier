@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { usePrivy } from "@privy-io/react-auth";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -18,24 +19,63 @@ import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { getInvoiceClient } from "@/features/invoices/client";
 import type { SerializedInvoice } from "@/features/invoices/types";
 
 type InvoiceDetailClientProps = {
-  invoice: SerializedInvoice | null;
-  error?: string;
+  invoiceId: string;
 };
 
 export function InvoiceDetailClient({
-  invoice,
-  error = "",
+  invoiceId,
 }: InvoiceDetailClientProps) {
   const { profile } = useMerchantProfile();
+  const { getAccessToken } = usePrivy();
+  const [invoice, setInvoice] = useState<SerializedInvoice | null>(null);
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function loadInvoice() {
+      setIsLoading(true);
+      setError("");
+
+      try {
+        const loadedInvoice = await getInvoiceClient(invoiceId, getAccessToken);
+
+        if (!isCancelled) {
+          setInvoice(loadedInvoice);
+        }
+      } catch (loadError) {
+        if (!isCancelled) {
+          setInvoice(null);
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load invoice.",
+          );
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    void loadInvoice();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [getAccessToken, invoiceId]);
 
   function handleCopyLink() {
     if (!invoice) return;
 
-    const url = `${window.location.origin}/pay/${invoice.id}`;
+    const url = `${window.location.origin}/pay/${invoice.publicId}`;
     void navigator.clipboard.writeText(url);
     setCopied(true);
     toast.success("Checkout link copied to clipboard");
@@ -50,7 +90,18 @@ export function InvoiceDetailClient({
         </Link>
       </Button>
 
-      {error && (
+      {isLoading && (
+        <Card className="border-card-border shadow-sm">
+          <CardContent className="p-8 text-center">
+            <h1 className="font-serif text-2xl font-semibold">Loading invoice</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Fetching the latest invoice details.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!isLoading && error && (
         <Card className="border-card-border shadow-sm">
           <CardContent className="p-8 text-center">
             <h1 className="font-serif text-2xl font-semibold">Invoice unavailable</h1>
@@ -62,7 +113,7 @@ export function InvoiceDetailClient({
         </Card>
       )}
 
-      {!error && invoice && (
+      {!isLoading && !error && invoice && (
         <>
           <header className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
             <div>
@@ -178,7 +229,7 @@ export function InvoiceDetailClient({
                     </p>
                   </div>
                   <Button asChild variant="secondary" size="sm">
-                    <Link href={`/pay/${invoice.id}`}>
+                    <Link href={`/pay/${invoice.publicId}`}>
                       Preview Checkout <ExternalLink className="size-4" />
                     </Link>
                   </Button>

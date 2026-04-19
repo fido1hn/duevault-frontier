@@ -1,26 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import {
-  getMerchantProfileByWallet,
+  getMerchantProfileForUser,
   upsertMerchantProfile,
 } from "@/features/merchant-profiles/service";
 import type { UpsertMerchantProfileInput } from "@/features/merchant-profiles/types";
+import { AuthError, authErrorResponse, requireAuthContext } from "@/server/auth";
 
 export async function GET(request: NextRequest) {
   try {
-    const walletAddress = request.nextUrl.searchParams.get("walletAddress");
-
-    if (!walletAddress) {
-      return NextResponse.json(
-        { error: "walletAddress is required." },
-        { status: 400 },
-      );
-    }
-
-    const profile = await getMerchantProfileByWallet(walletAddress);
+    const authContext = await requireAuthContext(request);
+    const profile = await getMerchantProfileForUser(authContext.user.id);
 
     return NextResponse.json({ profile });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return authErrorResponse(error);
+    }
+
     return NextResponse.json(
       {
         error:
@@ -35,11 +32,16 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const authContext = await requireAuthContext(request);
     const body = (await request.json()) as UpsertMerchantProfileInput;
-    const profile = await upsertMerchantProfile(body);
+    const profile = await upsertMerchantProfile(authContext, body);
 
     return NextResponse.json({ profile });
   } catch (error) {
+    if (error instanceof AuthError) {
+      return authErrorResponse(error);
+    }
+
     return NextResponse.json(
       {
         error:

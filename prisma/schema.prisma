@@ -8,36 +8,72 @@ datasource db {
 }
 
 model PaymentIntent {
-  id            String   @id @default(cuid())
-  merchantWallet String
-  amountAtomic  String
-  mint          String
-  status        String   @default("active")
-  note          String   @default("")
-  customerLabel String?
-  expiresAt     DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id                String          @id @default(cuid())
+  merchantProfileId String
+  merchantProfile   MerchantProfile @relation(fields: [merchantProfileId], references: [id], onDelete: Cascade)
+  amountAtomic      String
+  mint              String
+  status            String          @default("active")
+  note              String          @default("")
+  customerLabel     String?
+  expiresAt         DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
-  @@index([merchantWallet])
+  @@index([merchantProfileId])
+  @@index([merchantProfileId, status])
   @@index([status])
 }
 
+model User {
+  id              String           @id @default(cuid())
+  privyDid        String           @unique
+  email           String?
+  name            String?
+  wallets         Wallet[]
+  merchantProfile MerchantProfile?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+}
+
+model Wallet {
+  id                      String            @id @default(cuid())
+  userId                  String
+  user                    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chain                   String
+  address                 String
+  walletClientType        String?
+  connectorType           String?
+  primaryMerchantProfiles MerchantProfile[] @relation("PrimaryMerchantWallet")
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+
+  @@unique([chain, address])
+  @@index([userId])
+}
+
 model MerchantProfile {
-  id                    String    @id @default(cuid())
-  walletAddress         String    @unique
+  id                    String          @id @default(cuid())
+  userId                String          @unique
+  user                  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  primaryWalletId       String
+  primaryWallet         Wallet          @relation("PrimaryMerchantWallet", fields: [primaryWalletId], references: [id])
   businessName          String
   contactEmail          String
   businessAddress       String
-  defaultNotes          String    @default("Thank you for your business. Payment is expected within 30 days.")
-  defaultMint           String    @default("USDC")
-  paymentRail           String    @default("solana")
-  privacyRail           String    @default("umbra")
+  defaultNotes          String          @default("Thank you for your business. Payment is expected within 30 days.")
+  defaultMint           String          @default("USDC")
+  paymentRail           String          @default("solana")
+  privacyRail           String          @default("umbra")
   onboardingCompletedAt DateTime?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  customers             Customer[]
+  invoices              Invoice[]
+  paymentIntents        PaymentIntent[]
 
   @@index([contactEmail])
+  @@index([primaryWalletId])
 }
 
 model WaitlistSignup {
@@ -57,17 +93,25 @@ model WaitlistSignup {
 }
 
 model Customer {
-  id        String    @id @default(cuid())
-  name      String
-  email     String    @unique
-  invoices  Invoice[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                String          @id @default(cuid())
+  merchantProfileId String
+  merchantProfile   MerchantProfile @relation(fields: [merchantProfileId], references: [id], onDelete: Cascade)
+  name              String
+  email             String
+  invoices          Invoice[]
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([merchantProfileId, email])
+  @@index([merchantProfileId])
 }
 
 model Invoice {
   id                String            @id @default(cuid())
-  invoiceNumber     String            @unique
+  publicId          String            @unique @default(uuid())
+  merchantProfileId String
+  merchantProfile   MerchantProfile   @relation(fields: [merchantProfileId], references: [id], onDelete: Cascade)
+  invoiceNumber     String
   customerId        String
   customer          Customer          @relation(fields: [customerId], references: [id])
   customerName      String
@@ -84,6 +128,10 @@ model Invoice {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
+  @@unique([merchantProfileId, invoiceNumber])
+  @@index([merchantProfileId])
+  @@index([merchantProfileId, dueAt])
+  @@index([merchantProfileId, status])
   @@index([customerEmail])
   @@index([dueAt])
   @@index([status])

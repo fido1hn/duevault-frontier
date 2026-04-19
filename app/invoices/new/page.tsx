@@ -5,6 +5,7 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { usePrivy } from "@privy-io/react-auth";
 
 import { AppLayout } from "@/components/layout/app-layout";
 import { useMerchantProfile } from "@/components/merchant-profile-gate";
@@ -52,6 +53,7 @@ export default function NewInvoicePage() {
 function NewInvoiceContent() {
   const { profile } = useMerchantProfile();
   const router = useRouter();
+  const { getAccessToken } = usePrivy();
   const [clientName, setClientName] = useState("Atlas Labs");
   const [clientEmail, setClientEmail] = useState("billing@atlaslabs.io");
   const [invoiceNumber, setInvoiceNumber] = useState("DV-1007");
@@ -112,7 +114,7 @@ function NewInvoiceContent() {
     };
 
     try {
-      const invoice = await createInvoiceClient(payload);
+      const invoice = await createInvoiceClient(payload, getAccessToken);
 
       toast.success(
         status === "Draft" ? "Invoice draft saved." : "Invoice created.",

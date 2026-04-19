@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { usePrivy } from "@privy-io/react-auth";
 import { updatePaymentIntentClient } from "@/features/payment-intents/client";
 import type {
   PaymentIntentStatus,
@@ -16,6 +17,7 @@ export function PaymentIntentActions({
   intent,
 }: PaymentIntentActionsProps) {
   const router = useRouter();
+  const { getAccessToken } = usePrivy();
   const [error, setError] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
 
@@ -24,7 +26,7 @@ export function PaymentIntentActions({
     setIsPending(true);
 
     try {
-      await updatePaymentIntentClient(intent.id, { status });
+      await updatePaymentIntentClient(intent.id, { status }, getAccessToken);
       router.refresh();
     } catch (updateError) {
       setError(

@@ -8,10 +8,17 @@ import type {
   PrivacyRail,
 } from "@/features/invoices/types";
 
-export type MerchantProfileRecord = Prisma.MerchantProfileGetPayload<object>;
+const merchantProfileInclude = {
+  primaryWallet: true,
+} satisfies Prisma.MerchantProfileInclude;
+
+export type MerchantProfileRecord = Prisma.MerchantProfileGetPayload<{
+  include: typeof merchantProfileInclude;
+}>;
 
 export type UpsertMerchantProfileRecordInput = {
-  walletAddress: string;
+  userId: string;
+  primaryWalletId: string;
   businessName: string;
   contactEmail: string;
   businessAddress: string;
@@ -22,11 +29,12 @@ export type UpsertMerchantProfileRecordInput = {
   onboardingCompletedAt: Date;
 };
 
-export async function findMerchantProfileByWallet(walletAddress: string) {
+export async function findMerchantProfileByUserId(userId: string) {
   return db.merchantProfile.findUnique({
     where: {
-      walletAddress,
+      userId,
     },
+    include: merchantProfileInclude,
   });
 }
 
@@ -35,9 +43,10 @@ export async function upsertMerchantProfileRecord(
 ) {
   return db.merchantProfile.upsert({
     where: {
-      walletAddress: input.walletAddress,
+      userId: input.userId,
     },
     update: {
+      primaryWalletId: input.primaryWalletId,
       businessName: input.businessName,
       contactEmail: input.contactEmail,
       businessAddress: input.businessAddress,
@@ -48,5 +57,6 @@ export async function upsertMerchantProfileRecord(
       onboardingCompletedAt: input.onboardingCompletedAt,
     },
     create: input,
+    include: merchantProfileInclude,
   });
 }

@@ -4,6 +4,7 @@ import { formatUsdcValue, serializeInvoice } from "@/features/invoices/mappers";
 import {
   createInvoiceRecord,
   findInvoiceRecordByNumber,
+  findInvoiceRecordByPublicId,
   invoiceRecordExists,
   listInvoiceRecords,
 } from "@/features/invoices/repository";
@@ -25,21 +26,36 @@ export function formatUsdc(value: number) {
   return formatUsdcValue(value);
 }
 
-export async function listInvoices() {
-  const invoices = await listInvoiceRecords();
+export async function listInvoices(merchantProfileId: string) {
+  const invoices = await listInvoiceRecords(merchantProfileId);
 
   return invoices.map(serializeInvoice);
 }
 
-export async function getInvoiceByNumber(invoiceNumber: string) {
+export async function getInvoiceByNumber(
+  merchantProfileId: string,
+  invoiceNumber: string,
+) {
   const invoice = await findInvoiceRecordByNumber(
+    merchantProfileId,
     sanitizeInvoiceNumber(invoiceNumber),
   );
 
   return invoice ? serializeInvoice(invoice) : null;
 }
 
-export async function createInvoice(input: CreateInvoiceInput) {
+export async function getInvoiceByPublicId(publicId: string) {
+  const invoice = await findInvoiceRecordByPublicId(
+    sanitizeRequired(publicId, "Invoice ID"),
+  );
+
+  return invoice ? serializeInvoice(invoice) : null;
+}
+
+export async function createInvoice(
+  merchantProfileId: string,
+  input: CreateInvoiceInput,
+) {
   const invoiceNumber = sanitizeInvoiceNumber(input.invoiceNumber);
   const customerName = sanitizeRequired(input.clientName, "Client name");
   const customerEmail = sanitizeEmail(input.clientEmail);
@@ -57,11 +73,12 @@ export async function createInvoice(input: CreateInvoiceInput) {
   assertPrivacyRail(privacyRail);
   assertInvoiceMint(mint);
 
-  if (await invoiceRecordExists(invoiceNumber)) {
+  if (await invoiceRecordExists(merchantProfileId, invoiceNumber)) {
     throw new Error("An invoice with this number already exists.");
   }
 
   const invoice = await createInvoiceRecord({
+    merchantProfileId,
     invoiceNumber,
     customerName,
     customerEmail,

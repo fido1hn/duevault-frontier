@@ -15,7 +15,9 @@ export function serializeMerchantProfile(
 
   return {
     id: profile.id,
-    walletAddress: profile.walletAddress,
+    userId: profile.userId,
+    primaryWalletId: profile.primaryWalletId,
+    walletAddress: profile.primaryWallet.address,
     businessName: profile.businessName,
     contactEmail: profile.contactEmail,
     businessAddress: profile.businessAddress,

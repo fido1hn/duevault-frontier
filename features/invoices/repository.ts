@@ -16,6 +16,11 @@ const invoiceInclude = {
       sortOrder: "asc",
     },
   },
+  merchantProfile: {
+    include: {
+      primaryWallet: true,
+    },
+  },
 } satisfies Prisma.InvoiceInclude;
 
 export type InvoiceRecord = Prisma.InvoiceGetPayload<{
@@ -23,6 +28,7 @@ export type InvoiceRecord = Prisma.InvoiceGetPayload<{
 }>;
 
 export type CreateInvoiceRecordInput = {
+  merchantProfileId: string;
   invoiceNumber: string;
   customerName: string;
   customerEmail: string;
@@ -37,8 +43,11 @@ export type CreateInvoiceRecordInput = {
   lineItems: InvoiceLineItemCreateData[];
 };
 
-export async function listInvoiceRecords() {
+export async function listInvoiceRecords(merchantProfileId: string) {
   return db.invoice.findMany({
+    where: {
+      merchantProfileId,
+    },
     include: invoiceInclude,
     orderBy: {
       createdAt: "desc",
@@ -46,19 +55,40 @@ export async function listInvoiceRecords() {
   });
 }
 
-export async function findInvoiceRecordByNumber(invoiceNumber: string) {
+export async function findInvoiceRecordByNumber(
+  merchantProfileId: string,
+  invoiceNumber: string,
+) {
   return db.invoice.findUnique({
     where: {
-      invoiceNumber,
+      merchantProfileId_invoiceNumber: {
+        merchantProfileId,
+        invoiceNumber,
+      },
     },
     include: invoiceInclude,
   });
 }
 
-export async function invoiceRecordExists(invoiceNumber: string) {
+export async function findInvoiceRecordByPublicId(publicId: string) {
+  return db.invoice.findUnique({
+    where: {
+      publicId,
+    },
+    include: invoiceInclude,
+  });
+}
+
+export async function invoiceRecordExists(
+  merchantProfileId: string,
+  invoiceNumber: string,
+) {
   const invoice = await db.invoice.findUnique({
     where: {
-      invoiceNumber,
+      merchantProfileId_invoiceNumber: {
+        merchantProfileId,
+        invoiceNumber,
+      },
     },
     select: {
       id: true,
@@ -72,12 +102,16 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
   return db.$transaction(async (tx) => {
     const customer = await tx.customer.upsert({
       where: {
-        email: input.customerEmail,
+        merchantProfileId_email: {
+          merchantProfileId: input.merchantProfileId,
+          email: input.customerEmail,
+        },
       },
       update: {
         name: input.customerName,
       },
       create: {
+        merchantProfileId: input.merchantProfileId,
         name: input.customerName,
         email: input.customerEmail,
       },
@@ -85,6 +119,7 @@ export async function createInvoiceRecord(input: CreateInvoiceRecordInput) {
 
     return tx.invoice.create({
       data: {
+        merchantProfileId: input.merchantProfileId,
         invoiceNumber: input.invoiceNumber,
         customerId: customer.id,
         customerName: input.customerName,

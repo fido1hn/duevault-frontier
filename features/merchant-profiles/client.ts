@@ -2,18 +2,20 @@ import type {
   SerializedMerchantProfile,
   UpsertMerchantProfileInput,
 } from "@/features/merchant-profiles/types";
+import { authenticatedFetch, type GetAuthToken } from "@/features/auth/client";
 
 type ProfileResponse = {
   profile?: SerializedMerchantProfile | null;
   error?: string;
 };
 
-export async function getMerchantProfileByWalletClient(walletAddress: string) {
-  const response = await fetch(
-    `/api/merchant-profile?walletAddress=${encodeURIComponent(walletAddress)}`,
+export async function getMerchantProfileClient(getAuthToken: GetAuthToken) {
+  const response = await authenticatedFetch(
+    "/api/merchant-profile",
     {
       cache: "no-store",
     },
+    getAuthToken,
   );
   const payload = (await response.json()) as ProfileResponse;
 
@@ -26,14 +28,19 @@ export async function getMerchantProfileByWalletClient(walletAddress: string) {
 
 export async function upsertMerchantProfileClient(
   input: UpsertMerchantProfileInput,
+  getAuthToken: GetAuthToken,
 ) {
-  const response = await fetch("/api/merchant-profile", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
+  const response = await authenticatedFetch(
+    "/api/merchant-profile",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
     },
-    body: JSON.stringify(input),
-  });
+    getAuthToken,
+  );
   const payload = (await response.json()) as ProfileResponse;
 
   if (!response.ok || !payload.profile) {

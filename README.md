@@ -7,8 +7,8 @@ Primary tagline: `Private receivables for stablecoin businesses`
 This repository is currently on **step 1 foundation**:
 
 - Next.js App Router skeleton
-- Solana wallet provider shell
-- Prisma + Supabase Postgres for off-chain receivables records
+- Privy auth with email or external Solana wallets
+- Prisma + Supabase Postgres for owned off-chain receivables records
 - minimal merchant pages and payment-request API routes
 - Umbra SDK kept behind a clean app-facing service boundary
 
@@ -25,7 +25,6 @@ What works now:
 
 What comes next:
 
-- real wallet-aware merchant session state
 - Umbra registration flow
 - live private payment creation and claiming
 - live private balance query and withdrawals
@@ -44,6 +43,18 @@ Create or update the Supabase Postgres schema from Prisma:
 bun run db:migrate
 ```
 
+Generate Prisma Client after schema changes:
+
+```bash
+bun run db:generate
+```
+
+Deploy committed migrations to Supabase production:
+
+```bash
+bun run db:deploy:prod
+```
+
 Start the app:
 
 ```bash
@@ -58,18 +69,32 @@ bun run build
 
 ## Environment
 
-Copy `.env.example` to `.env` if needed.
+Copy `.env.example` to `.env.local` for local development.
 
 The default local setup uses:
 
 - Supabase Postgres for off-chain records
-- Solana devnet RPC
+- Prisma migrations as the source of truth for app tables
+- Privy for merchant authentication and external Solana wallet linking
+- checkout recipient and USDC mint envs for Solana Pay QR previews
+
+Required auth envs:
+
+- `NEXT_PUBLIC_PRIVY_APP_ID`
+- `PRIVY_APP_SECRET`
+- `PRIVY_JWT_VERIFICATION_KEY` if you want to pin token verification to the dashboard key
+
+Required database envs:
+
+- `DATABASE_URL` for runtime Prisma queries
+- `DIRECT_URL` for Prisma migrations against Supabase Postgres
 
 ## Project structure
 
 - `app/`: Next.js pages and route handlers
-- `components/`: UI building blocks and wallet providers
+- `components/`: UI building blocks and app providers
 - `features/`: vertical feature slices for invoices, merchant profiles, payment intents, waitlist, and checkout
+- `server/auth.ts`: server-only Privy access token verification and user/wallet sync
 - `server/db.ts`: server-only Prisma client singleton
 - `fixtures/`: demo data used by prototype-only screens
 - `lib/`: shared utilities, formatting, and brand constants
@@ -78,6 +103,8 @@ The default local setup uses:
 
 ## References
 
+- [Privy React setup](https://docs.privy.io/basics/react/setup)
+- [Privy access token verification](https://docs.privy.io/guide/server/authorization/verification)
 - [Umbra Quickstart](https://sdk.umbraprivacy.com/quickstart)
 - [Umbra Supported Tokens](https://sdk.umbraprivacy.com/supported-tokens)
 - [Umbra X25519 Compliance Grants](https://sdk.umbraprivacy.com/sdk/compliance-x25519-grants)

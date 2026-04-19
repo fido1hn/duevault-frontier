@@ -9,7 +9,8 @@ export function serializePaymentIntent(
 
   return {
     id: intent.id,
-    merchantWallet: intent.merchantWallet,
+    merchantProfileId: intent.merchantProfileId,
+    merchantWallet: intent.merchantProfile.primaryWallet.address,
     amountAtomic: intent.amountAtomic,
     mint: intent.mint,
     status: intent.status,

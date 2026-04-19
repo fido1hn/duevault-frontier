@@ -24,14 +24,18 @@ import {
   type CheckoutPaymentStatus,
   type CheckoutPaymentViewModel,
 } from "@/features/checkout/service";
-import type { SerializedInvoice } from "@/features/invoices/types";
+import type { InvoiceStatus } from "@/features/invoices/types";
 
 type CheckoutQrPaymentProps = {
   checkout: CheckoutPaymentViewModel;
 };
 
 type InvoiceStatusResponse = {
-  invoice?: SerializedInvoice;
+  invoice?: {
+    publicId: string;
+    invoiceNumber: string;
+    status: InvoiceStatus;
+  };
   error?: string;
 };
 

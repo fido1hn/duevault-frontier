@@ -7,10 +7,20 @@ import type {
   UpdatePaymentIntentRecordInput,
 } from "@/features/payment-intents/types";
 
-export type PaymentIntentRecord = Prisma.PaymentIntentGetPayload<object>;
+const paymentIntentInclude = {
+  merchantProfile: {
+    include: {
+      primaryWallet: true,
+    },
+  },
+} satisfies Prisma.PaymentIntentInclude;
+
+export type PaymentIntentRecord = Prisma.PaymentIntentGetPayload<{
+  include: typeof paymentIntentInclude;
+}>;
 
 export type CreatePaymentIntentRecordInput = {
-  merchantWallet: string;
+  merchantProfileId: string;
   amountAtomic: string;
   mint: SupportedMint;
   status: "active";
@@ -19,8 +29,15 @@ export type CreatePaymentIntentRecordInput = {
   expiresAt: Date | null;
 };
 
-export async function listPaymentIntentRecords(limit?: number) {
+export async function listPaymentIntentRecords(
+  merchantProfileId: string,
+  limit?: number,
+) {
   return db.paymentIntent.findMany({
+    where: {
+      merchantProfileId,
+    },
+    include: paymentIntentInclude,
     orderBy: {
       createdAt: "desc",
     },
@@ -28,11 +45,16 @@ export async function listPaymentIntentRecords(limit?: number) {
   });
 }
 
-export async function findPaymentIntentById(intentId: string) {
-  return db.paymentIntent.findUnique({
+export async function findPaymentIntentById(
+  merchantProfileId: string,
+  intentId: string,
+) {
+  return db.paymentIntent.findFirst({
     where: {
       id: intentId,
+      merchantProfileId,
     },
+    include: paymentIntentInclude,
   });
 }
 
@@ -41,17 +63,34 @@ export async function createPaymentIntentRecord(
 ) {
   return db.paymentIntent.create({
     data: input,
+    include: paymentIntentInclude,
   });
 }
 
 export async function updatePaymentIntentRecord(
+  merchantProfileId: string,
   intentId: string,
   input: UpdatePaymentIntentRecordInput,
 ) {
+  const existingIntent = await db.paymentIntent.findFirst({
+    where: {
+      id: intentId,
+      merchantProfileId,
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!existingIntent) {
+    return null;
+  }
+
   return db.paymentIntent.update({
     where: {
       id: intentId,
     },
     data: input,
+    include: paymentIntentInclude,
   });
 }

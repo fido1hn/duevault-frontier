@@ -4,6 +4,7 @@ import type {
   SerializedPaymentIntent,
   UpdatePaymentIntentInput,
 } from "@/features/payment-intents/types";
+import { authenticatedFetch, type GetAuthToken } from "@/features/auth/client";
 
 type PaymentIntentsResponse = {
   intents?: SerializedPaymentIntent[];
@@ -15,10 +16,14 @@ type PaymentIntentResponse = {
   error?: string;
 };
 
-export async function listPaymentIntentsClient() {
-  const response = await fetch("/api/payment-intents", {
-    cache: "no-store",
-  });
+export async function listPaymentIntentsClient(getAuthToken: GetAuthToken) {
+  const response = await authenticatedFetch(
+    "/api/payment-intents",
+    {
+      cache: "no-store",
+    },
+    getAuthToken,
+  );
   const payload = (await response.json()) as PaymentIntentsResponse;
 
   if (!response.ok) {
@@ -30,14 +35,19 @@ export async function listPaymentIntentsClient() {
 
 export async function createPaymentIntentClient(
   input: CreatePaymentIntentInput,
+  getAuthToken: GetAuthToken,
 ) {
-  const response = await fetch("/api/payment-intents", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
+  const response = await authenticatedFetch(
+    "/api/payment-intents",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
     },
-    body: JSON.stringify(input),
-  });
+    getAuthToken,
+  );
   const payload = (await response.json()) as PaymentIntentResponse;
 
   if (!response.ok || !payload.intent) {
@@ -50,14 +60,19 @@ export async function createPaymentIntentClient(
 export async function updatePaymentIntentClient(
   intentId: string,
   input: UpdatePaymentIntentInput & { status?: PaymentIntentStatus },
+  getAuthToken: GetAuthToken,
 ) {
-  const response = await fetch(`/api/payment-intents/${intentId}`, {
-    method: "PATCH",
-    headers: {
-      "Content-Type": "application/json",
+  const response = await authenticatedFetch(
+    `/api/payment-intents/${intentId}`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
     },
-    body: JSON.stringify(input),
-  });
+    getAuthToken,
+  );
   const payload = (await response.json()) as PaymentIntentResponse;
 
   if (!response.ok || !payload.intent) {

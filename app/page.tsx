@@ -14,6 +14,7 @@ import {
 
 import MagicRings from "@/components/effects/magic-rings";
 import { Button } from "@/components/ui/button";
+import { WalletProfileAction } from "@/components/wallet-profile-action";
 
 const promiseItems = [
   {
@@ -107,9 +108,9 @@ export default function Home() {
             </div>
           </Link>
           <nav className="flex items-center gap-2 sm:gap-3">
-            <Button asChild size="sm">
-              <Link href="/waitlist">Join Waitlist</Link>
-            </Button>
+            <WalletProfileAction destination="/dashboard" size="sm">
+              Get Started
+            </WalletProfileAction>
           </nav>
         </header>
 

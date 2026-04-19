@@ -6,6 +6,8 @@ import type {
 
 export type SerializedMerchantProfile = {
   id: string;
+  userId: string;
+  primaryWalletId: string;
   walletAddress: string;
   businessName: string;
   contactEmail: string;
@@ -20,7 +22,7 @@ export type SerializedMerchantProfile = {
 };
 
 export type UpsertMerchantProfileInput = {
-  walletAddress: string;
+  primaryWalletAddress?: string;
   businessName: string;
   contactEmail: string;
   businessAddress: string;

@@ -8,7 +8,7 @@ import {
   type CheckoutPaymentViewModel,
 } from "@/features/checkout/service";
 import { business, formatUsdc, getInvoiceById } from "@/fixtures/demo-data";
-import { getInvoiceByNumber } from "@/features/invoices/service";
+import { getInvoiceByPublicId } from "@/features/invoices/service";
 import type { SerializedInvoice } from "@/features/invoices/types";
 
 export const dynamic = "force-dynamic";
@@ -41,11 +41,13 @@ function demoInvoiceLineItems(
 
 async function getCheckoutInvoice(intentId: string) {
   try {
-    const invoice = await getInvoiceByNumber(intentId);
+    const invoice = await getInvoiceByPublicId(intentId);
 
     if (invoice) {
       return {
         source: "database" as CheckoutPaymentSource,
+        publicId: invoice.publicId,
+        merchantName: invoice.merchantName,
         invoiceNumber: invoice.invoiceNumber,
         amountNumber: invoice.amountNumber,
         amountDisplay: invoice.amount,
@@ -63,6 +65,8 @@ async function getCheckoutInvoice(intentId: string) {
 
   return {
     source: "demo" as CheckoutPaymentSource,
+    publicId: null,
+    merchantName: business.name,
     invoiceNumber: invoice.id,
     amountNumber: invoice.amountNumber,
     amountDisplay: invoice.amount,
@@ -78,7 +82,7 @@ function buildCheckoutViewModel(
 ): CheckoutPaymentViewModel {
   const paymentConfig = getCheckoutPaymentConfig();
   const memo = `DueVault invoice ${invoice.invoiceNumber}`;
-  const label = business.name;
+  const label = invoice.merchantName;
   const message = `Payment for invoice ${invoice.invoiceNumber}`;
   const solanaPayUrl = paymentConfig.isConfigured
     ? buildSolanaPayUrl({
@@ -93,7 +97,7 @@ function buildCheckoutViewModel(
 
   return {
     invoiceNumber: invoice.invoiceNumber,
-    merchantName: business.name,
+    merchantName: invoice.merchantName,
     amountNumber: invoice.amountNumber,
     amountDisplay: invoice.amountDisplay,
     mint: invoice.mint,
@@ -106,8 +110,8 @@ function buildCheckoutViewModel(
     message,
     source: invoice.source,
     statusEndpoint:
-      invoice.source === "database"
-        ? `/api/invoices/${encodeURIComponent(invoice.invoiceNumber)}`
+      invoice.source === "database" && invoice.publicId
+        ? `/api/checkout/${encodeURIComponent(invoice.publicId)}`
         : null,
     paymentStatus: mapCheckoutPaymentStatus(invoice.status),
     configurationError: paymentConfig.isConfigured ? null : paymentConfig.error,

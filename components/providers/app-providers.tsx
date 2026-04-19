@@ -1,6 +1,6 @@
 "use client";
 
-import { AppWalletProvider } from "@/components/providers/wallet-provider";
+import { AppPrivyProvider } from "@/components/providers/privy-provider";
 import { Toaster } from "@/components/ui/sonner";
 
 type AppProvidersProps = {
@@ -9,9 +9,9 @@ type AppProvidersProps = {
 
 export function AppProviders({ children }: AppProvidersProps) {
   return (
-    <AppWalletProvider>
+    <AppPrivyProvider>
       {children}
       <Toaster richColors position="bottom-right" />
-    </AppWalletProvider>
+    </AppPrivyProvider>
   );
 }

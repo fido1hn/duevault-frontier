@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { WalletButton } from "@/components/wallet-button";
 import { BRAND_NAME, BRAND_TAGLINES } from "@/lib/brand";
 
 const navItems = [
@@ -34,8 +33,6 @@ export function Navigation() {
           </Link>
         ))}
       </nav>
-
-      <WalletButton />
     </header>
   );
 }

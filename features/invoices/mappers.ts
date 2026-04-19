@@ -41,6 +41,10 @@ export function serializeInvoice(invoice: InvoiceRecord): SerializedInvoice {
   return {
     id: invoice.invoiceNumber,
     invoiceId: invoice.id,
+    publicId: invoice.publicId,
+    merchantProfileId: invoice.merchantProfileId,
+    merchantName: invoice.merchantProfile.businessName,
+    merchantWalletAddress: invoice.merchantProfile.primaryWallet.address,
     invoiceNumber: invoice.invoiceNumber,
     client: invoice.customerName,
     clientEmail: invoice.customerEmail,

@@ -2,12 +2,14 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { usePrivy } from "@privy-io/react-auth";
+import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { createPaymentIntentClient } from "@/features/payment-intents/client";
 
 export function CreateIntentForm() {
   const router = useRouter();
-  const { publicKey } = useWallet();
+  const { getAccessToken } = usePrivy();
+  const { profile } = useMerchantProfile();
   const [amountAtomic, setAmountAtomic] = useState("1000000");
   const [note, setNote] = useState("");
   const [customerLabel, setCustomerLabel] = useState("");
@@ -21,14 +23,16 @@ export function CreateIntentForm() {
     setIsSubmitting(true);
 
     try {
-      const intent = await createPaymentIntentClient({
-        merchantWallet: publicKey?.toBase58() ?? "demo-merchant-wallet",
-        amountAtomic,
-        mint: "USDC",
-        note,
-        customerLabel,
-        expiresAt: expiresAt || null,
-      });
+      const intent = await createPaymentIntentClient(
+        {
+          amountAtomic,
+          mint: "USDC",
+          note,
+          customerLabel,
+          expiresAt: expiresAt || null,
+        },
+        getAccessToken,
+      );
 
       router.push(`/pay/${intent.id}`);
       router.refresh();
@@ -103,7 +107,7 @@ export function CreateIntentForm() {
 
       <div className="merchant-hint">
         <span>Receiving wallet</span>
-        <code>{publicKey?.toBase58() ?? "demo-merchant-wallet"}</code>
+        <code>{profile.walletAddress}</code>
       </div>
 
       {error ? <p className="error-text">{error}</p> : null}

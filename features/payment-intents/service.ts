@@ -16,24 +16,32 @@ import {
   assertPaymentIntentStatus,
   parseOptionalDate,
   sanitizeAmountAtomic,
-  sanitizeMerchantWallet,
 } from "@/features/payment-intents/validators";
 
-export async function listPaymentIntents(limit?: number) {
-  const intents = await listPaymentIntentRecords(limit);
+export async function listPaymentIntents(
+  merchantProfileId: string,
+  limit?: number,
+) {
+  const intents = await listPaymentIntentRecords(merchantProfileId, limit);
 
   return intents.map(serializePaymentIntent);
 }
 
-export async function getPaymentIntentById(intentId: string) {
-  const intent = await findPaymentIntentById(intentId);
+export async function getPaymentIntentById(
+  merchantProfileId: string,
+  intentId: string,
+) {
+  const intent = await findPaymentIntentById(merchantProfileId, intentId);
 
   return intent ? serializePaymentIntent(intent) : null;
 }
 
-export async function createPaymentIntent(input: CreatePaymentIntentInput) {
+export async function createPaymentIntent(
+  merchantProfileId: string,
+  input: CreatePaymentIntentInput,
+) {
   const intent = await createPaymentIntentRecord({
-    merchantWallet: sanitizeMerchantWallet(input.merchantWallet),
+    merchantProfileId,
     amountAtomic: sanitizeAmountAtomic(input.amountAtomic),
     mint: input.mint ?? "USDC",
     status: "active",
@@ -46,6 +54,7 @@ export async function createPaymentIntent(input: CreatePaymentIntentInput) {
 }
 
 export async function updatePaymentIntent(
+  merchantProfileId: string,
   intentId: string,
   input: UpdatePaymentIntentInput,
 ) {
@@ -73,7 +82,15 @@ export async function updatePaymentIntent(
     data.expiresAt = parseOptionalDate(input.expiresAt);
   }
 
-  const intent = await updatePaymentIntentRecord(intentId, data);
+  const intent = await updatePaymentIntentRecord(
+    merchantProfileId,
+    intentId,
+    data,
+  );
+
+  if (!intent) {
+    throw new Error("Payment request not found.");
+  }
 
   return serializePaymentIntent(intent);
 }
