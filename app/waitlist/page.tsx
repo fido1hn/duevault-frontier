@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, BadgeCheck, LockKeyhole, ReceiptText } from "lucide-react";
 
-import MagicRings from "@/components/effects/magic-rings";
 import { WaitlistForm } from "@/components/waitlist-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
+const MagicRings = dynamic(() => import("@/components/effects/magic-rings"), {
+  ssr: false,
+  loading: () => <div className="h-full w-full" />,
+});
 
 function getWaitlistSource(source: string | null, ref: string | null) {
   return source || ref || "homepage";

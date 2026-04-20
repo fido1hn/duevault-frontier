@@ -4,8 +4,12 @@ import { NextRequest, NextResponse } from "next/server";
 import type { LinkedAccount, User as PrivyUser } from "@privy-io/node";
 import type { Prisma, Wallet } from "@/generated/prisma/client";
 
+import {
+  describePrivyAccessToken,
+  isDebugFlagEnabled,
+} from "@/features/auth/token-debug";
 import { db } from "@/server/db";
-import { getPrivyClient } from "@/server/privy";
+import { getPrivyClient, PrivyConfigurationError } from "@/server/privy";
 
 const authMerchantProfileInclude = {
   primaryWallet: true,
@@ -175,27 +179,189 @@ async function syncPrivyUser(privyUser: PrivyUser) {
   });
 }
 
+type SyncedPrivyUser = Awaited<ReturnType<typeof syncPrivyUser>>;
+type PrivyClientInstance = Awaited<ReturnType<typeof getPrivyClient>>;
+type PrivyAccessTokenClaims = Awaited<
+  ReturnType<
+    ReturnType<
+      ReturnType<PrivyClientInstance["utils"]>["auth"]
+    >["verifyAccessToken"]
+  >
+>;
+
+const AUTH_CACHE_TTL_MS = 15_000;
+const MAX_AUTH_CACHE_ENTRIES = 100;
+
+const privyUserCache = new Map<
+  string,
+  {
+    privyUser: PrivyUser;
+    expiresAt: number;
+  }
+>();
+const syncedPrivyUserCache = new Map<
+  string,
+  {
+    synced: SyncedPrivyUser;
+    expiresAt: number;
+  }
+>();
+
+function canUseAuthCache(request: NextRequest) {
+  return request.method === "GET" || request.method === "HEAD";
+}
+
+function readCacheEntry<T>(cache: Map<string, { expiresAt: number } & T>, key: string) {
+  const entry = cache.get(key);
+
+  if (!entry) {
+    return null;
+  }
+
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+
+  return entry;
+}
+
+function writeCacheEntry<T>(
+  cache: Map<string, { expiresAt: number } & T>,
+  key: string,
+  value: T,
+) {
+  if (cache.size >= MAX_AUTH_CACHE_ENTRIES) {
+    const firstKey = cache.keys().next().value;
+
+    if (firstKey) {
+      cache.delete(firstKey);
+    }
+  }
+
+  cache.set(key, {
+    ...value,
+    expiresAt: Date.now() + AUTH_CACHE_TTL_MS,
+  });
+}
+
+async function getPrivyUserForAuth(
+  client: PrivyClientInstance,
+  userId: string,
+  useCache: boolean,
+) {
+  if (useCache) {
+    const cachedUser = readCacheEntry(privyUserCache, userId);
+
+    if (cachedUser) {
+      return cachedUser.privyUser;
+    }
+  }
+
+  const privyUser = await client.users()._get(userId);
+
+  writeCacheEntry(privyUserCache, userId, { privyUser });
+
+  return privyUser;
+}
+
+function getSyncedPrivyUserCacheKey(privyUser: PrivyUser) {
+  const email = extractEmail(privyUser) ?? "";
+  const name = getDisplayName(privyUser) ?? "";
+  const wallets = extractSolanaWallets(privyUser)
+    .map(
+      (wallet) =>
+        `${wallet.address}:${wallet.connectorType ?? ""}:${wallet.walletClientType ?? ""}`,
+    )
+    .sort()
+    .join("|");
+
+  return `${privyUser.id}:${email}:${name}:${wallets}`;
+}
+
+async function syncPrivyUserForAuth(privyUser: PrivyUser, useCache: boolean) {
+  const cacheKey = getSyncedPrivyUserCacheKey(privyUser);
+
+  if (useCache) {
+    const cachedSync = readCacheEntry(syncedPrivyUserCache, cacheKey);
+
+    if (cachedSync) {
+      return cachedSync.synced;
+    }
+  }
+
+  const synced = await syncPrivyUser(privyUser);
+
+  writeCacheEntry(syncedPrivyUserCache, cacheKey, { synced });
+
+  return synced;
+}
+
 export async function requireAuthContext(
   request: NextRequest,
 ): Promise<AuthContext> {
   const accessToken = extractBearerToken(request);
+  const shouldLogDebug = shouldLogPrivyAuthDebug();
+  const useAuthCache = canUseAuthCache(request);
 
   if (!accessToken) {
+    if (shouldLogDebug) {
+      console.warn("[Privy auth] Missing access token", {
+        path: request.nextUrl.pathname,
+        hasAuthorizationHeader: Boolean(request.headers.get("authorization")),
+      });
+    }
+
     throw new AuthError("A Privy access token is required.", 401);
   }
 
   let privyUser: PrivyUser;
+  const tokenDebugContext = getPrivyTokenDebugContext(accessToken);
+  const client = await getPrivyClientForAuth(request);
+  let claims: PrivyAccessTokenClaims;
 
   try {
-    const client = getPrivyClient();
-    const claims = await client.utils().auth().verifyAccessToken(accessToken);
+    claims = await client.utils().auth().verifyAccessToken(accessToken);
 
-    privyUser = await client.users()._get(claims.user_id);
-  } catch {
+    if (shouldLogDebug) {
+      console.info("[Privy auth] Verified access token", {
+        path: request.nextUrl.pathname,
+        ...tokenDebugContext,
+        userId: claims.user_id,
+      });
+    }
+  } catch (error) {
+    if (tokenDebugContext.audienceMatchesConfiguredAppId === false) {
+      console.warn("[Privy auth] Access token audience mismatch", {
+        path: request.nextUrl.pathname,
+        ...tokenDebugContext,
+      });
+    }
+
+    if (shouldLogDebug) {
+      console.warn("[Privy auth] Access token verification failed", {
+        path: request.nextUrl.pathname,
+        ...tokenDebugContext,
+        error: serializeAuthError(error),
+      });
+    }
+
     throw new AuthError("Invalid or expired Privy access token.", 401);
   }
 
-  const synced = await syncPrivyUser(privyUser);
+  try {
+    privyUser = await getPrivyUserForAuth(client, claims.user_id, useAuthCache);
+  } catch (error) {
+    console.error("[Privy auth] Privy user lookup failed", {
+      path: request.nextUrl.pathname,
+      userId: claims.user_id,
+      error: serializeAuthError(error),
+    });
+
+    throw new AuthError("Unable to confirm Privy user with Privy.", 502);
+  }
+
+  const synced = await syncPrivyUserForAuth(privyUser, useAuthCache);
   const merchantProfile = await db.merchantProfile.findUnique({
     where: {
       userId: synced.user.id,
@@ -211,6 +377,74 @@ export async function requireAuthContext(
     primarySolanaWallet: synced.solanaWallets[0] ?? null,
     merchantProfile,
   };
+}
+
+async function getPrivyClientForAuth(request: NextRequest) {
+  try {
+    return await getPrivyClient();
+  } catch (error) {
+    if (error instanceof PrivyConfigurationError) {
+      console.error("[Privy auth] Configuration error", {
+        path: request.nextUrl.pathname,
+        error: serializeAuthError(error),
+      });
+
+      throw new AuthError("Privy authentication is not configured correctly.", 500);
+    }
+
+    throw error;
+  }
+}
+
+function getPrivyTokenDebugContext(accessToken: string) {
+  const token = describePrivyAccessToken(accessToken);
+  const configuredAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? null;
+  const audience = "audience" in token ? (token.audience ?? null) : null;
+
+  return {
+    token,
+    configuredAppId,
+    audienceMatchesConfiguredAppId: doesAudienceMatchAppId(
+      audience,
+      configuredAppId,
+    ),
+  };
+}
+
+function doesAudienceMatchAppId(
+  audience: string | string[] | null,
+  appId: string | null,
+) {
+  if (!audience || !appId) {
+    return null;
+  }
+
+  return Array.isArray(audience) ? audience.includes(appId) : audience === appId;
+}
+
+function serializeAuthError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return error;
+  }
+
+  return {
+    name: error.name,
+    message: error.message,
+    cause:
+      error.cause instanceof Error
+        ? {
+            name: error.cause.name,
+            message: error.cause.message,
+          }
+        : undefined,
+  };
+}
+
+function shouldLogPrivyAuthDebug() {
+  return (
+    isDebugFlagEnabled(process.env.DEBUG_PRIVY_AUTH) ||
+    isDebugFlagEnabled(process.env.NEXT_PUBLIC_DEBUG_PRIVY_AUTH)
+  );
 }
 
 export async function requireMerchantProfile(request: NextRequest) {

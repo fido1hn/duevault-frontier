@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { motion } from "motion/react";
 import {
   ArrowRight,
@@ -12,9 +13,24 @@ import {
   Shield,
 } from "lucide-react";
 
-import MagicRings from "@/components/effects/magic-rings";
 import { Button } from "@/components/ui/button";
-import { WalletProfileAction } from "@/components/wallet-profile-action";
+
+const MagicRings = dynamic(() => import("@/components/effects/magic-rings"), {
+  ssr: false,
+  loading: () => <div className="h-full w-full" />,
+});
+
+const WalletProfileActionBoundary = dynamic(
+  () => import("@/components/wallet-profile-action-boundary"),
+  {
+    ssr: false,
+    loading: () => (
+      <Button type="button" size="sm" disabled>
+        Get Started
+      </Button>
+    ),
+  },
+);
 
 const promiseItems = [
   {
@@ -108,9 +124,9 @@ export default function Home() {
             </div>
           </Link>
           <nav className="flex items-center gap-2 sm:gap-3">
-            <WalletProfileAction destination="/dashboard" size="sm">
+            <WalletProfileActionBoundary destination="/dashboard" size="sm">
               Get Started
-            </WalletProfileAction>
+            </WalletProfileActionBoundary>
           </nav>
         </header>
 

@@ -7,6 +7,8 @@ import { usePrivy } from "@privy-io/react-auth";
 import { ArrowRight, Building2, Loader2, LogIn, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
+import { AppPrivyProvider } from "@/components/providers/privy-provider";
+import { AppQueryProvider } from "@/components/providers/query-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -15,9 +17,9 @@ import {
 } from "@/features/auth/privy-wallets";
 import { getSafeNextPath } from "@/features/auth/routing";
 import {
-  getMerchantProfileClient,
-  upsertMerchantProfileClient,
-} from "@/features/merchant-profiles/client";
+  useMerchantProfileQuery,
+  useUpsertMerchantProfileMutation,
+} from "@/features/merchant-profiles/queries";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -35,60 +37,50 @@ import type { UpsertMerchantProfileInput } from "@/features/merchant-profiles/ty
 function OnboardingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { authenticated, getAccessToken, linkWallet, login, ready, user } =
-    usePrivy();
+  const { authenticated, linkWallet, login, ready, user } = usePrivy();
   const nextPath = getSafeNextPath(searchParams.get("next"));
   const solanaWallets = useMemo(() => getLinkedSolanaWallets(user), [user]);
   const walletAddress = solanaWallets[0]?.address ?? null;
+  const profileQuery = useMerchantProfileQuery({
+    enabled: ready && authenticated,
+  });
+  const upsertProfile = useUpsertMerchantProfileMutation();
   const [businessName, setBusinessName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [businessAddress, setBusinessAddress] = useState("");
   const [defaultNotes, setDefaultNotes] = useState(DEFAULT_PROFILE_NOTES);
   const [paymentRail, setPaymentRail] = useState<PaymentRail>("solana");
   const [privacyRail, setPrivacyRail] = useState<PrivacyRail>("umbra");
-  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const isLoadingProfile =
+    ready && authenticated && profileQuery.isPending && !isRedirecting;
+  const isSubmitting = upsertProfile.isPending;
 
   useEffect(() => {
     if (!ready || !authenticated) {
-      setIsLoadingProfile(false);
       setIsRedirecting(false);
       setError("");
       return;
     }
 
-    let isCancelled = false;
-
-    async function loadProfile() {
-      setIsLoadingProfile(true);
-      setIsRedirecting(false);
-      setError("");
-
-      try {
-        const profile = await getMerchantProfileClient(getAccessToken);
-
-        if (!isCancelled && profile) {
-          setIsRedirecting(true);
-          router.replace(nextPath);
-          return;
-        }
-      } catch {
-        // Onboarding is the safe fallback if the profile check cannot finish.
-      } finally {
-        if (!isCancelled) {
-          setIsLoadingProfile(false);
-        }
-      }
+    if (profileQuery.isSuccess && profileQuery.data) {
+      setIsRedirecting(true);
+      router.replace(nextPath);
+      return;
     }
 
-    void loadProfile();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [authenticated, getAccessToken, nextPath, ready, router]);
+    if (profileQuery.isSuccess && !profileQuery.data) {
+      setIsRedirecting(false);
+    }
+  }, [
+    authenticated,
+    nextPath,
+    profileQuery.data,
+    profileQuery.isSuccess,
+    ready,
+    router,
+  ]);
 
   async function handleSubmit() {
     if (!authenticated) {
@@ -107,7 +99,6 @@ function OnboardingContent() {
       return;
     }
 
-    setIsSubmitting(true);
     setError("");
 
     const payload: UpsertMerchantProfileInput = {
@@ -122,7 +113,7 @@ function OnboardingContent() {
     };
 
     try {
-      await upsertMerchantProfileClient(payload, getAccessToken);
+      await upsertProfile.mutateAsync(payload);
       toast.success("Company profile saved.");
       router.push(nextPath);
       router.refresh();
@@ -133,8 +124,6 @@ function OnboardingContent() {
           : "Unable to save company profile.";
       setError(message);
       toast.error(message);
-    } finally {
-      setIsSubmitting(false);
     }
   }
 
@@ -397,14 +386,18 @@ function OnboardingContent() {
 
 export default function OnboardingPage() {
   return (
-    <Suspense
-      fallback={
-        <main className="flex min-h-screen items-center justify-center bg-background">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        </main>
-      }
-    >
-      <OnboardingContent />
-    </Suspense>
+    <AppPrivyProvider>
+      <AppQueryProvider>
+        <Suspense
+          fallback={
+            <main className="flex min-h-screen items-center justify-center bg-background">
+              <Loader2 className="size-6 animate-spin text-muted-foreground" />
+            </main>
+          }
+        >
+          <OnboardingContent />
+        </Suspense>
+      </AppQueryProvider>
+    </AppPrivyProvider>
   );
 }

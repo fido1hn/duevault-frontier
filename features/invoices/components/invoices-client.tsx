@@ -1,16 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowUpRight, Search } from "lucide-react";
-import { usePrivy } from "@privy-io/react-auth";
 
 import { StatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { listInvoicesClient } from "@/features/invoices/client";
+import { useInvoicesQuery } from "@/features/invoices/queries";
 import type { SerializedInvoice } from "@/features/invoices/types";
 import { cn } from "@/lib/utils";
 
@@ -25,34 +24,19 @@ export function InvoicesClient({
   initialInvoices = [],
   initialError = "",
 }: InvoicesClientProps) {
-  const { getAccessToken } = usePrivy();
   const [activeFilter, setActiveFilter] = useState("All");
   const [query, setQuery] = useState("");
-  const [invoices, setInvoices] = useState(initialInvoices);
-  const [isLoading, setIsLoading] = useState(initialInvoices.length === 0);
-  const [error, setError] = useState(initialError);
+  const invoicesQuery = useInvoicesQuery({
+    initialData: initialInvoices.length > 0 ? initialInvoices : undefined,
+  });
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
-
-  const reloadInvoices = useCallback(async function reloadInvoices() {
-    setIsLoading(true);
-    setError("");
-
-    try {
-      setInvoices(await listInvoicesClient(getAccessToken));
-    } catch (loadError) {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Unable to load invoices.",
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [getAccessToken]);
-
-  useEffect(() => {
-    void reloadInvoices();
-  }, [reloadInvoices]);
+  const invoices = invoicesQuery.data ?? [];
+  const isLoading = invoicesQuery.isPending;
+  const error = invoicesQuery.isError
+    ? invoicesQuery.error instanceof Error
+      ? invoicesQuery.error.message
+      : "Unable to load invoices."
+    : initialError;
 
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesStatus =
@@ -152,7 +136,7 @@ export function InvoicesClient({
                       size="sm"
                       variant="outline"
                       className="mt-4 bg-card"
-                      onClick={() => void reloadInvoices()}
+                      onClick={() => void invoicesQuery.refetch()}
                     >
                       Try again
                     </Button>

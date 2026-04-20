@@ -5,12 +5,11 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { usePrivy } from "@privy-io/react-auth";
 
 import { AppLayout } from "@/components/layout/app-layout";
 import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { Button } from "@/components/ui/button";
-import { createInvoiceClient } from "@/features/invoices/client";
+import { useCreateInvoiceMutation } from "@/features/invoices/queries";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -53,7 +52,7 @@ export default function NewInvoicePage() {
 function NewInvoiceContent() {
   const { profile } = useMerchantProfile();
   const router = useRouter();
-  const { getAccessToken } = usePrivy();
+  const createInvoice = useCreateInvoiceMutation();
   const [clientName, setClientName] = useState("Atlas Labs");
   const [clientEmail, setClientEmail] = useState("billing@atlaslabs.io");
   const [invoiceNumber, setInvoiceNumber] = useState("DV-1007");
@@ -66,8 +65,8 @@ function NewInvoiceContent() {
     { id: 1, description: "Product strategy sprint", quantity: 1, price: 1600 },
     { id: 2, description: "Umbra integration advisory", quantity: 1, price: 650 },
   ]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const isSubmitting = createInvoice.isPending;
 
   const total = lineItems.reduce(
     (sum, item) => sum + item.quantity * item.price,
@@ -92,7 +91,6 @@ function NewInvoiceContent() {
   }
 
   async function submitInvoice(status: InvoiceStatus) {
-    setIsSubmitting(true);
     setSubmitError("");
 
     const payload: CreateInvoiceInput = {
@@ -114,7 +112,7 @@ function NewInvoiceContent() {
     };
 
     try {
-      const invoice = await createInvoiceClient(payload, getAccessToken);
+      const invoice = await createInvoice.mutateAsync(payload);
 
       toast.success(
         status === "Draft" ? "Invoice draft saved." : "Invoice created.",
@@ -126,8 +124,6 @@ function NewInvoiceContent() {
         error instanceof Error ? error.message : "Unable to create invoice.";
       setSubmitError(message);
       toast.error(message);
-    } finally {
-      setIsSubmitting(false);
     }
   }
 

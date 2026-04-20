@@ -2,7 +2,11 @@ import type {
   SerializedMerchantProfile,
   UpsertMerchantProfileInput,
 } from "@/features/merchant-profiles/types";
-import { authenticatedFetch, type GetAuthToken } from "@/features/auth/client";
+import {
+  authenticatedFetch,
+  createApiClientError,
+  type GetAuthToken,
+} from "@/features/auth/client";
 
 type ProfileResponse = {
   profile?: SerializedMerchantProfile | null;
@@ -20,7 +24,11 @@ export async function getMerchantProfileClient(getAuthToken: GetAuthToken) {
   const payload = (await response.json()) as ProfileResponse;
 
   if (!response.ok) {
-    throw new Error(payload.error ?? "Unable to load merchant profile.");
+    throw createApiClientError(
+      response,
+      "Unable to load merchant profile.",
+      payload.error,
+    );
   }
 
   return payload.profile ?? null;
@@ -44,7 +52,11 @@ export async function upsertMerchantProfileClient(
   const payload = (await response.json()) as ProfileResponse;
 
   if (!response.ok || !payload.profile) {
-    throw new Error(payload.error ?? "Unable to save company profile.");
+    throw createApiClientError(
+      response,
+      "Unable to save company profile.",
+      payload.error,
+    );
   }
 
   return payload.profile;

@@ -1,9 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
-import { usePrivy } from "@privy-io/react-auth";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -19,8 +18,7 @@ import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { getInvoiceClient } from "@/features/invoices/client";
-import type { SerializedInvoice } from "@/features/invoices/types";
+import { useInvoiceQuery } from "@/features/invoices/queries";
 
 type InvoiceDetailClientProps = {
   invoiceId: string;
@@ -30,47 +28,15 @@ export function InvoiceDetailClient({
   invoiceId,
 }: InvoiceDetailClientProps) {
   const { profile } = useMerchantProfile();
-  const { getAccessToken } = usePrivy();
-  const [invoice, setInvoice] = useState<SerializedInvoice | null>(null);
-  const [error, setError] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
+  const invoiceQuery = useInvoiceQuery(invoiceId);
+  const invoice = invoiceQuery.data ?? null;
+  const error = invoiceQuery.isError
+    ? invoiceQuery.error instanceof Error
+      ? invoiceQuery.error.message
+      : "Unable to load invoice."
+    : "";
+  const isLoading = invoiceQuery.isPending;
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function loadInvoice() {
-      setIsLoading(true);
-      setError("");
-
-      try {
-        const loadedInvoice = await getInvoiceClient(invoiceId, getAccessToken);
-
-        if (!isCancelled) {
-          setInvoice(loadedInvoice);
-        }
-      } catch (loadError) {
-        if (!isCancelled) {
-          setInvoice(null);
-          setError(
-            loadError instanceof Error
-              ? loadError.message
-              : "Unable to load invoice.",
-          );
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    void loadInvoice();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [getAccessToken, invoiceId]);
 
   function handleCopyLink() {
     if (!invoice) return;

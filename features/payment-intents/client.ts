@@ -4,7 +4,11 @@ import type {
   SerializedPaymentIntent,
   UpdatePaymentIntentInput,
 } from "@/features/payment-intents/types";
-import { authenticatedFetch, type GetAuthToken } from "@/features/auth/client";
+import {
+  authenticatedFetch,
+  createApiClientError,
+  type GetAuthToken,
+} from "@/features/auth/client";
 
 type PaymentIntentsResponse = {
   intents?: SerializedPaymentIntent[];
@@ -27,10 +31,38 @@ export async function listPaymentIntentsClient(getAuthToken: GetAuthToken) {
   const payload = (await response.json()) as PaymentIntentsResponse;
 
   if (!response.ok) {
-    throw new Error(payload.error ?? "Unable to load payment requests.");
+    throw createApiClientError(
+      response,
+      "Unable to load payment requests.",
+      payload.error,
+    );
   }
 
   return payload.intents ?? [];
+}
+
+export async function getPaymentIntentClient(
+  intentId: string,
+  getAuthToken: GetAuthToken,
+) {
+  const response = await authenticatedFetch(
+    `/api/payment-intents/${encodeURIComponent(intentId)}`,
+    {
+      cache: "no-store",
+    },
+    getAuthToken,
+  );
+  const payload = (await response.json()) as PaymentIntentResponse;
+
+  if (!response.ok || !payload.intent) {
+    throw createApiClientError(
+      response,
+      "Payment request not found.",
+      payload.error,
+    );
+  }
+
+  return payload.intent;
 }
 
 export async function createPaymentIntentClient(
@@ -51,7 +83,11 @@ export async function createPaymentIntentClient(
   const payload = (await response.json()) as PaymentIntentResponse;
 
   if (!response.ok || !payload.intent) {
-    throw new Error(payload.error ?? "Unable to create payment request.");
+    throw createApiClientError(
+      response,
+      "Unable to create payment request.",
+      payload.error,
+    );
   }
 
   return payload.intent;
@@ -76,7 +112,11 @@ export async function updatePaymentIntentClient(
   const payload = (await response.json()) as PaymentIntentResponse;
 
   if (!response.ok || !payload.intent) {
-    throw new Error(payload.error ?? "Unable to update payment request.");
+    throw createApiClientError(
+      response,
+      "Unable to update payment request.",
+      payload.error,
+    );
   }
 
   return payload.intent;

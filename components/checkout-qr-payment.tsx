@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import QRCode from "qrcode";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -22,9 +21,14 @@ import { Separator } from "@/components/ui/separator";
 import {
   mapCheckoutPaymentStatus,
   type CheckoutPaymentStatus,
-  type CheckoutPaymentViewModel,
-} from "@/features/checkout/service";
+} from "@/features/checkout/status";
+import type { CheckoutPaymentViewModel } from "@/features/checkout/service";
 import type { InvoiceStatus } from "@/features/invoices/types";
+
+const CheckoutQrCode = dynamic(() => import("@/components/checkout-qr-code"), {
+  ssr: false,
+  loading: () => <QrCode className="size-16 animate-pulse text-slate-300" />,
+});
 
 type CheckoutQrPaymentProps = {
   checkout: CheckoutPaymentViewModel;
@@ -150,37 +154,9 @@ function PaymentStatusPanel({
 }
 
 export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
-  const [qrDataUrl, setQrDataUrl] = useState("");
   const [paymentStatus, setPaymentStatus] = useState(checkout.paymentStatus);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    if (!checkout.solanaPayUrl) {
-      setQrDataUrl("");
-      return;
-    }
-
-    void QRCode.toDataURL(checkout.solanaPayUrl, {
-      color: {
-        dark: "#113537",
-        light: "#ffffff",
-      },
-      errorCorrectionLevel: "M",
-      margin: 1,
-      width: 384,
-    }).then((url) => {
-      if (!isCancelled) {
-        setQrDataUrl(url);
-      }
-    });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [checkout.solanaPayUrl]);
 
   useEffect(() => {
     setPaymentStatus(checkout.paymentStatus);
@@ -320,18 +296,10 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
                   Scan to pay
                 </div>
                 <div className="mx-auto flex size-[17rem] max-w-full items-center justify-center rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm sm:size-[18.5rem]">
-                  {qrDataUrl ? (
-                    <Image
-                      src={qrDataUrl}
-                      alt={`Solana Pay QR code for invoice ${checkout.invoiceNumber}`}
-                      width={384}
-                      height={384}
-                      unoptimized
-                      className="size-full object-contain"
-                    />
-                  ) : (
-                    <QrCode className="size-16 animate-pulse text-slate-300" />
-                  )}
+                  <CheckoutQrCode
+                    invoiceNumber={checkout.invoiceNumber}
+                    solanaPayUrl={checkout.solanaPayUrl}
+                  />
                 </div>
                 <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-slate-500">
                   Scan with a Solana Pay wallet or copy the details below.

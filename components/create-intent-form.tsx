@@ -2,37 +2,32 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { usePrivy } from "@privy-io/react-auth";
 import { useMerchantProfile } from "@/components/merchant-profile-gate";
-import { createPaymentIntentClient } from "@/features/payment-intents/client";
+import { useCreatePaymentIntentMutation } from "@/features/payment-intents/queries";
 
 export function CreateIntentForm() {
   const router = useRouter();
-  const { getAccessToken } = usePrivy();
+  const createPaymentIntent = useCreatePaymentIntentMutation();
   const { profile } = useMerchantProfile();
   const [amountAtomic, setAmountAtomic] = useState("1000000");
   const [note, setNote] = useState("");
   const [customerLabel, setCustomerLabel] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmitting = createPaymentIntent.isPending;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setIsSubmitting(true);
 
     try {
-      const intent = await createPaymentIntentClient(
-        {
-          amountAtomic,
-          mint: "USDC",
-          note,
-          customerLabel,
-          expiresAt: expiresAt || null,
-        },
-        getAccessToken,
-      );
+      const intent = await createPaymentIntent.mutateAsync({
+        amountAtomic,
+        mint: "USDC",
+        note,
+        customerLabel,
+        expiresAt: expiresAt || null,
+      });
 
       router.push(`/pay/${intent.id}`);
       router.refresh();
@@ -42,8 +37,6 @@ export function CreateIntentForm() {
           ? submissionError.message
           : "Unable to create payment request.",
       );
-    } finally {
-      setIsSubmitting(false);
     }
   }
 

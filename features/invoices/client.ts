@@ -2,7 +2,11 @@ import type {
   CreateInvoiceInput,
   SerializedInvoice,
 } from "@/features/invoices/types";
-import { authenticatedFetch, type GetAuthToken } from "@/features/auth/client";
+import {
+  authenticatedFetch,
+  createApiClientError,
+  type GetAuthToken,
+} from "@/features/auth/client";
 
 type InvoicesResponse = {
   invoices?: SerializedInvoice[];
@@ -25,7 +29,11 @@ export async function listInvoicesClient(getAuthToken: GetAuthToken) {
   const payload = (await response.json()) as InvoicesResponse;
 
   if (!response.ok) {
-    throw new Error(payload.error ?? "Unable to load invoices.");
+    throw createApiClientError(
+      response,
+      "Unable to load invoices.",
+      payload.error,
+    );
   }
 
   return payload.invoices ?? [];
@@ -45,7 +53,7 @@ export async function getInvoiceClient(
   const payload = (await response.json()) as InvoiceResponse;
 
   if (!response.ok || !payload.invoice) {
-    throw new Error(payload.error ?? "Invoice not found.");
+    throw createApiClientError(response, "Invoice not found.", payload.error);
   }
 
   return payload.invoice;
@@ -69,7 +77,11 @@ export async function createInvoiceClient(
   const payload = (await response.json()) as InvoiceResponse;
 
   if (!response.ok || !payload.invoice) {
-    throw new Error(payload.error ?? "Unable to create invoice.");
+    throw createApiClientError(
+      response,
+      "Unable to create invoice.",
+      payload.error,
+    );
   }
 
   return payload.invoice;

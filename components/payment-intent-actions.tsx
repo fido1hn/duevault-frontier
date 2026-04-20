@@ -2,8 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { usePrivy } from "@privy-io/react-auth";
-import { updatePaymentIntentClient } from "@/features/payment-intents/client";
+import { useUpdatePaymentIntentMutation } from "@/features/payment-intents/queries";
 import type {
   PaymentIntentStatus,
   SerializedPaymentIntent,
@@ -17,16 +16,18 @@ export function PaymentIntentActions({
   intent,
 }: PaymentIntentActionsProps) {
   const router = useRouter();
-  const { getAccessToken } = usePrivy();
+  const updatePaymentIntent = useUpdatePaymentIntentMutation();
   const [error, setError] = useState<string | null>(null);
-  const [isPending, setIsPending] = useState(false);
+  const isPending = updatePaymentIntent.isPending;
 
   async function updateStatus(status: PaymentIntentStatus) {
     setError(null);
-    setIsPending(true);
 
     try {
-      await updatePaymentIntentClient(intent.id, { status }, getAccessToken);
+      await updatePaymentIntent.mutateAsync({
+        intentId: intent.id,
+        input: { status },
+      });
       router.refresh();
     } catch (updateError) {
       setError(
@@ -34,8 +35,6 @@ export function PaymentIntentActions({
           ? updateError.message
           : "Unable to update payment request.",
       );
-    } finally {
-      setIsPending(false);
     }
   }
 
