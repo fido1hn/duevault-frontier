@@ -10,14 +10,17 @@ import {
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
-import { Building2, Loader2, LogIn, Wallet } from "lucide-react";
+import { Building2, Loader2, Wallet } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
   getLinkedSolanaWallets,
   SOLANA_WALLET_LIST,
 } from "@/features/auth/privy-wallets";
-import { buildOnboardingPath } from "@/features/auth/routing";
+import {
+  buildOnboardingPath,
+  buildSafeCurrentPath,
+} from "@/features/auth/routing";
 import { useMerchantProfileQuery } from "@/features/merchant-profiles/queries";
 import type { SerializedMerchantProfile } from "@/features/merchant-profiles/types";
 
@@ -28,10 +31,6 @@ type MerchantProfileContextValue = {
 
 const MerchantProfileContext =
   createContext<MerchantProfileContextValue | null>(null);
-
-function buildSafeCurrentPath(pathname: string, queryString: string) {
-  return queryString ? `${pathname}?${queryString}` : pathname;
-}
 
 function GateShell({
   icon,
@@ -61,14 +60,12 @@ function GateShell({
 }
 
 export function MerchantProfileProvider({ children }: { children: ReactNode }) {
-  const { authenticated, linkWallet, login, ready, user } = usePrivy();
+  const { linkWallet, user } = usePrivy();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryString = searchParams.toString();
-  const profileQuery = useMerchantProfileQuery({
-    enabled: ready && authenticated,
-  });
+  const profileQuery = useMerchantProfileQuery();
   const profile = profileQuery.data ?? null;
   const solanaWallets = useMemo(() => getLinkedSolanaWallets(user), [user]);
   const isProfileWalletLinked = profile
@@ -76,7 +73,7 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
     : false;
 
   useEffect(() => {
-    if (!ready || !authenticated || !profileQuery.isSuccess || profile) {
+    if (!profileQuery.isSuccess || profile) {
       return;
     }
 
@@ -84,12 +81,10 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
       buildOnboardingPath(buildSafeCurrentPath(pathname, queryString)),
     );
   }, [
-    authenticated,
     pathname,
     profile,
     profileQuery.isSuccess,
     queryString,
-    ready,
     router,
   ]);
 
@@ -105,38 +100,6 @@ export function MerchantProfileProvider({ children }: { children: ReactNode }) {
       refreshProfile,
     };
   }, [profile, refreshProfile]);
-
-  if (!ready) {
-    return (
-      <GateShell
-        icon={<Loader2 className="size-5 animate-spin" />}
-        title="Loading sign-in"
-        body="Preparing your DueVault workspace."
-      />
-    );
-  }
-
-  if (!authenticated) {
-    return (
-      <GateShell
-        icon={<LogIn className="size-5" />}
-        title="Sign in to continue"
-        body="Use email or a Solana wallet to open your merchant workspace."
-        action={
-          <Button
-            onClick={() =>
-              login({
-                loginMethods: ["wallet", "email"],
-                walletChainType: "solana-only",
-              })
-            }
-          >
-            Sign in
-          </Button>
-        }
-      />
-    );
-  }
 
   if (profileQuery.isPending || (profileQuery.isSuccess && !profile)) {
     return (

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { motion } from "motion/react";
 import { ArrowUpRight, Download, ExternalLink } from "lucide-react";
 
-import { AppLayout } from "@/components/layout/app-layout";
 import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -13,11 +12,7 @@ import { invoices, summaryData } from "@/fixtures/demo-data";
 import { cn } from "@/lib/utils";
 
 export default function Dashboard() {
-  return (
-    <AppLayout>
-      <DashboardContent />
-    </AppLayout>
-  );
+  return <DashboardContent />;
 }
 
 function DashboardContent() {

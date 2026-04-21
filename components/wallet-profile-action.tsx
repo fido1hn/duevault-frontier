@@ -1,88 +1,101 @@
 "use client";
 
-import { useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useRef, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useLogin, usePrivy } from "@privy-io/react-auth";
-import { useQueryClient } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import {
   getLinkedSolanaWallets,
   SOLANA_WALLET_LIST,
 } from "@/features/auth/privy-wallets";
-import { buildOnboardingPath, getSafeNextPath } from "@/features/auth/routing";
-import { merchantProfileQueryOptions } from "@/features/merchant-profiles/queries";
+import { getSafeNextPath } from "@/features/auth/routing";
 
-type WalletProfileActionProps = Omit<ComponentProps<typeof Button>, "onClick"> & {
+export type WalletProfileActionControllerProps = {
   destination: string;
+  actionSignal: number;
+  onActionHandled: (actionSignal: number) => void;
+  onBusyChange?: (isBusy: boolean) => void;
 };
 
-export function WalletProfileAction({
+export function WalletProfileActionController({
   destination,
-  children,
-  disabled,
-  ...buttonProps
-}: WalletProfileActionProps) {
+  actionSignal,
+  onActionHandled,
+  onBusyChange,
+}: WalletProfileActionControllerProps) {
   const router = useRouter();
-  const queryClient = useQueryClient();
-  const { authenticated, getAccessToken, linkWallet, ready, user } = usePrivy();
-  const [isChecking, setIsChecking] = useState(false);
+  const { authenticated, linkWallet, ready, user } = usePrivy();
+  const [isRouting, startRouting] = useTransition();
+  const handledActionSignalRef = useRef(0);
   const hasSolanaWallet = getLinkedSolanaWallets(user).length > 0;
 
-  async function routeAfterAuth(target: string) {
-    setIsChecking(true);
+  useEffect(() => {
+    onBusyChange?.(isRouting);
+  }, [isRouting, onBusyChange]);
 
-    try {
-      const safeTarget = getSafeNextPath(target);
-      const profile = await queryClient
-        .ensureQueryData(merchantProfileQueryOptions(getAccessToken))
-        .catch(() => null);
-      const nextPath = profile ? safeTarget : buildOnboardingPath(safeTarget);
+  const routeAfterAuth = useCallback((target: string) => {
+    const nextPath = getSafeNextPath(target);
 
+    startRouting(() => {
       router.push(nextPath);
-    } finally {
-      setIsChecking(false);
-    }
-  }
+    });
+  }, [router]);
 
   const { login } = useLogin({
     onComplete: () => {
-      void routeAfterAuth(destination);
+      routeAfterAuth(destination);
     },
   });
 
-  function handleClick() {
-    if (!ready) return;
+  const handleAction = useCallback(
+    (signal: number) => {
+      if (!ready) return;
 
-    if (!authenticated) {
-      login({
-        loginMethods: ["wallet", "email"],
-        walletChainType: "solana-only",
-      });
-      return;
-    }
+      if (!authenticated) {
+        login({
+          loginMethods: ["wallet", "email"],
+          walletChainType: "solana-only",
+        });
+        onActionHandled(signal);
+        return;
+      }
 
-    if (!hasSolanaWallet) {
-      linkWallet({
-        walletChainType: "solana-only",
-        walletList: SOLANA_WALLET_LIST,
-      });
-      return;
-    }
+      if (!hasSolanaWallet) {
+        linkWallet({
+          walletChainType: "solana-only",
+          walletList: SOLANA_WALLET_LIST,
+        });
+        onActionHandled(signal);
+        return;
+      }
 
-    void routeAfterAuth(destination);
-  }
-
-  return (
-    <Button
-      type="button"
-      disabled={disabled || !ready || isChecking}
-      onClick={handleClick}
-      {...buttonProps}
-    >
-      {isChecking && <Loader2 className="size-4 animate-spin" />}
-      {children}
-    </Button>
+      routeAfterAuth(destination);
+      onActionHandled(signal);
+    },
+    [
+      authenticated,
+      destination,
+      hasSolanaWallet,
+      linkWallet,
+      login,
+      onActionHandled,
+      ready,
+      routeAfterAuth,
+    ],
   );
+
+  useEffect(() => {
+    if (
+      actionSignal <= 0 ||
+      actionSignal === handledActionSignalRef.current ||
+      !ready
+    ) {
+      return;
+    }
+
+    handledActionSignalRef.current = actionSignal;
+    handleAction(actionSignal);
+  }, [actionSignal, handleAction, ready]);
+
+  return null;
 }

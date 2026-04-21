@@ -1,6 +1,5 @@
 "use client";
 
-import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import {
@@ -14,8 +13,7 @@ import { activityLog } from "@/fixtures/demo-data";
 
 export default function ActivityPage() {
   return (
-    <AppLayout>
-      <div className="mx-auto flex max-w-5xl flex-col gap-8 p-6 md:p-8">
+    <div className="mx-auto flex max-w-5xl flex-col gap-8 p-6 md:p-8">
         <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <h1 className="font-serif text-3xl font-semibold tracking-tight text-foreground">
@@ -94,6 +92,5 @@ export default function ActivityPage() {
           </div>
         </Card>
       </div>
-    </AppLayout>
   );
 }

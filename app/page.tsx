@@ -14,23 +14,12 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { WalletProfileActionShell } from "@/components/wallet-profile-action-shell";
 
 const MagicRings = dynamic(() => import("@/components/effects/magic-rings"), {
   ssr: false,
   loading: () => <div className="h-full w-full" />,
 });
-
-const WalletProfileActionBoundary = dynamic(
-  () => import("@/components/wallet-profile-action-boundary"),
-  {
-    ssr: false,
-    loading: () => (
-      <Button type="button" size="sm" disabled>
-        Get Started
-      </Button>
-    ),
-  },
-);
 
 const promiseItems = [
   {
@@ -124,9 +113,9 @@ export default function Home() {
             </div>
           </Link>
           <nav className="flex items-center gap-2 sm:gap-3">
-            <WalletProfileActionBoundary destination="/dashboard" size="sm">
+            <WalletProfileActionShell destination="/dashboard" size="sm">
               Get Started
-            </WalletProfileActionBoundary>
+            </WalletProfileActionShell>
           </nav>
         </header>
 

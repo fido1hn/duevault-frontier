@@ -1,6 +1,5 @@
 "use client";
 
-import { AppLayout } from "@/components/layout/app-layout";
 import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,11 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function SettingsPage() {
-  return (
-    <AppLayout>
-      <SettingsContent />
-    </AppLayout>
-  );
+  return <SettingsContent />;
 }
 
 function SettingsContent() {

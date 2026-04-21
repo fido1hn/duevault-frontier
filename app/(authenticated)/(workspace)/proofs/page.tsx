@@ -5,7 +5,6 @@ import { motion } from "motion/react";
 import { toast } from "sonner";
 import { Download, EyeOff, FileCheck, ShieldCheck } from "lucide-react";
 
-import { AppLayout } from "@/components/layout/app-layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,8 +23,7 @@ export default function ProofsPage() {
   }
 
   return (
-    <AppLayout>
-      <div className="mx-auto flex max-w-5xl flex-col gap-8 p-6 md:p-8">
+    <div className="mx-auto flex max-w-5xl flex-col gap-8 p-6 md:p-8">
         <header>
           <h1 className="font-serif text-3xl font-semibold tracking-tight text-foreground">
             Selective Disclosure
@@ -164,6 +162,5 @@ export default function ProofsPage() {
           </section>
         </div>
       </div>
-    </AppLayout>
   );
 }

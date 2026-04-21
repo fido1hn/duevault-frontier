@@ -4,11 +4,9 @@ import Link from "next/link";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
-import { ArrowRight, Building2, Loader2, LogIn, Wallet } from "lucide-react";
+import { ArrowRight, Building2, Loader2, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
-import { AppPrivyProvider } from "@/components/providers/privy-provider";
-import { AppQueryProvider } from "@/components/providers/query-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -37,13 +35,11 @@ import type { UpsertMerchantProfileInput } from "@/features/merchant-profiles/ty
 function OnboardingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { authenticated, linkWallet, login, ready, user } = usePrivy();
+  const { linkWallet, user } = usePrivy();
   const nextPath = getSafeNextPath(searchParams.get("next"));
   const solanaWallets = useMemo(() => getLinkedSolanaWallets(user), [user]);
   const walletAddress = solanaWallets[0]?.address ?? null;
-  const profileQuery = useMerchantProfileQuery({
-    enabled: ready && authenticated,
-  });
+  const profileQuery = useMerchantProfileQuery();
   const upsertProfile = useUpsertMerchantProfileMutation();
   const [businessName, setBusinessName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
@@ -53,17 +49,10 @@ function OnboardingContent() {
   const [privacyRail, setPrivacyRail] = useState<PrivacyRail>("umbra");
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [error, setError] = useState("");
-  const isLoadingProfile =
-    ready && authenticated && profileQuery.isPending && !isRedirecting;
+  const isLoadingProfile = profileQuery.isPending && !isRedirecting;
   const isSubmitting = upsertProfile.isPending;
 
   useEffect(() => {
-    if (!ready || !authenticated) {
-      setIsRedirecting(false);
-      setError("");
-      return;
-    }
-
     if (profileQuery.isSuccess && profileQuery.data) {
       setIsRedirecting(true);
       router.replace(nextPath);
@@ -74,23 +63,13 @@ function OnboardingContent() {
       setIsRedirecting(false);
     }
   }, [
-    authenticated,
     nextPath,
     profileQuery.data,
     profileQuery.isSuccess,
-    ready,
     router,
   ]);
 
   async function handleSubmit() {
-    if (!authenticated) {
-      login({
-        loginMethods: ["wallet", "email"],
-        walletChainType: "solana-only",
-      });
-      return;
-    }
-
     if (!walletAddress) {
       linkWallet({
         walletChainType: "solana-only",
@@ -116,7 +95,6 @@ function OnboardingContent() {
       await upsertProfile.mutateAsync(payload);
       toast.success("Company profile saved.");
       router.push(nextPath);
-      router.refresh();
     } catch (submitError) {
       const message =
         submitError instanceof Error
@@ -125,50 +103,6 @@ function OnboardingContent() {
       setError(message);
       toast.error(message);
     }
-  }
-
-  if (!ready) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="size-6 animate-spin text-muted-foreground" />
-      </main>
-    );
-  }
-
-  if (!authenticated) {
-    return (
-      <main className="flex min-h-screen items-center justify-center bg-background px-6 py-12">
-        <Card className="w-full max-w-md border-card-border text-center shadow-xl shadow-primary/5">
-          <CardHeader>
-            <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <LogIn className="size-5" />
-            </div>
-            <CardTitle className="font-serif text-2xl">
-              Sign in to set up DueVault
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              Use email or a Solana wallet to create your merchant workspace.
-            </p>
-            <Button
-              className="mt-6 w-full"
-              onClick={() =>
-                login({
-                  loginMethods: ["wallet", "email"],
-                  walletChainType: "solana-only",
-                })
-              }
-            >
-              Sign in
-            </Button>
-            <Button asChild variant="link" className="mt-2">
-              <Link href="/">Back to homepage</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </main>
-    );
   }
 
   if (isLoadingProfile || isRedirecting) {
@@ -386,18 +320,14 @@ function OnboardingContent() {
 
 export default function OnboardingPage() {
   return (
-    <AppPrivyProvider>
-      <AppQueryProvider>
-        <Suspense
-          fallback={
-            <main className="flex min-h-screen items-center justify-center bg-background">
-              <Loader2 className="size-6 animate-spin text-muted-foreground" />
-            </main>
-          }
-        >
-          <OnboardingContent />
-        </Suspense>
-      </AppQueryProvider>
-    </AppPrivyProvider>
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-background">
+          <Loader2 className="size-6 animate-spin text-muted-foreground" />
+        </main>
+      }
+    >
+      <OnboardingContent />
+    </Suspense>
   );
 }

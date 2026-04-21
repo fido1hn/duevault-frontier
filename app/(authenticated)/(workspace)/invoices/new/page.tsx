@@ -6,7 +6,6 @@ import { motion } from "motion/react";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { AppLayout } from "@/components/layout/app-layout";
 import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { Button } from "@/components/ui/button";
 import { useCreateInvoiceMutation } from "@/features/invoices/queries";
@@ -42,11 +41,7 @@ function formatUsdc(value: number) {
 }
 
 export default function NewInvoicePage() {
-  return (
-    <AppLayout>
-      <NewInvoiceContent />
-    </AppLayout>
-  );
+  return <NewInvoiceContent />;
 }
 
 function NewInvoiceContent() {

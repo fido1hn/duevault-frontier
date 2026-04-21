@@ -13,7 +13,6 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-import { AppLayout } from "@/components/layout/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { business, getInvoiceById } from "@/fixtures/demo-data";
@@ -32,8 +31,7 @@ export default function SettlementPage() {
   }
 
   return (
-    <AppLayout>
-      <div className="mx-auto flex max-w-4xl flex-col gap-8 p-6 md:p-8">
+    <div className="mx-auto flex max-w-4xl flex-col gap-8 p-6 md:p-8">
         <Button asChild variant="ghost" size="sm" className="w-fit pl-0 text-muted-foreground">
           <Link href={`/invoices/${invoice.id}`}>
             <ArrowLeft className="size-4" /> Back to Invoice
@@ -167,6 +165,5 @@ export default function SettlementPage() {
           </Card>
         </div>
       </div>
-    </AppLayout>
   );
 }

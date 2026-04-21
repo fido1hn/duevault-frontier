@@ -1,4 +1,3 @@
-import { AppLayout } from "@/components/layout/app-layout";
 import { InvoiceDetailClient } from "@/features/invoices/components/invoice-detail-client";
 
 export const dynamic = "force-dynamic";
@@ -14,9 +13,5 @@ export default async function InvoiceDetailPage({
 }: InvoiceDetailPageProps) {
   const { invoiceId } = await params;
 
-  return (
-    <AppLayout>
-      <InvoiceDetailClient invoiceId={invoiceId} />
-    </AppLayout>
-  );
+  return <InvoiceDetailClient invoiceId={invoiceId} />;
 }

@@ -16,6 +16,21 @@ export function getSafeNextPath(value: string | null | undefined) {
   return DEFAULT_POST_AUTH_DESTINATION;
 }
 
+export function buildSafeCurrentPath(
+  pathname: string,
+  queryString?: string | null,
+) {
+  return getSafeNextPath(
+    queryString ? `${pathname}?${queryString}` : pathname,
+  );
+}
+
+export function buildHomeRedirectPath(destination?: string | null) {
+  const safeDestination = getSafeNextPath(destination);
+
+  return `/?next=${encodeURIComponent(safeDestination)}`;
+}
+
 export function buildOnboardingPath(destination?: string | null) {
   const safeDestination = getSafeNextPath(destination);
 
