@@ -53,27 +53,35 @@ model Wallet {
 }
 
 model MerchantProfile {
-  id                    String          @id @default(cuid())
-  userId                String          @unique
-  user                  User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  primaryWalletId       String
-  primaryWallet         Wallet          @relation("PrimaryMerchantWallet", fields: [primaryWalletId], references: [id])
-  businessName          String
-  contactEmail          String
-  businessAddress       String
-  defaultNotes          String          @default("Thank you for your business. Payment is expected within 30 days.")
-  defaultMint           String          @default("USDC")
-  paymentRail           String          @default("solana")
-  privacyRail           String          @default("umbra")
-  onboardingCompletedAt DateTime?
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
-  customers             Customer[]
-  invoices              Invoice[]
-  paymentIntents        PaymentIntent[]
+  id                          String          @id @default(cuid())
+  userId                      String          @unique
+  user                        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  primaryWalletId             String
+  primaryWallet               Wallet          @relation("PrimaryMerchantWallet", fields: [primaryWalletId], references: [id])
+  businessName                String
+  contactEmail                String
+  businessAddress             String
+  defaultNotes                String          @default("Thank you for your business. Payment is expected within 30 days.")
+  defaultMint                 String          @default("USDC")
+  paymentRail                 String          @default("solana")
+  privacyRail                 String          @default("umbra")
+  umbraNetwork                String          @default("devnet")
+  umbraStatus                 String          @default("not_setup")
+  umbraRegisteredAt           DateTime?
+  umbraWalletAddress          String?
+  umbraRegistrationSignatures String[]        @default([])
+  umbraLastCheckedAt          DateTime?
+  onboardingCompletedAt       DateTime?
+  createdAt                   DateTime        @default(now())
+  updatedAt                   DateTime        @updatedAt
+  customers                   Customer[]
+  invoices                    Invoice[]
+  paymentIntents              PaymentIntent[]
 
   @@index([contactEmail])
   @@index([primaryWalletId])
+  @@index([umbraStatus])
+  @@index([umbraWalletAddress])
 }
 
 model WaitlistSignup {

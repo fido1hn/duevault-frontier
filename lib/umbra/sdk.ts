@@ -5,6 +5,7 @@ import {
   getComplianceGrantRevokerFunction,
   getEncryptedBalanceToPublicBalanceDirectWithdrawerFunction,
   getMasterViewingKeyX25519KeypairDeriver,
+  getPollingTransactionForwarder,
   getPublicBalanceToEncryptedBalanceDirectDepositorFunction,
   getPublicBalanceToReceiverClaimableUtxoCreatorFunction,
   getReceiverClaimableUtxoToEncryptedBalanceClaimerFunction,
@@ -14,22 +15,31 @@ import {
   getUserAccountQuerierFunction,
   getUserRegistrationFunction,
 } from "@umbra-privacy/sdk";
-import type { IUmbraSigner } from "@umbra-privacy/sdk/interfaces";
+import type {
+  IUmbraSigner,
+  UserRegistrationOptions,
+} from "@umbra-privacy/sdk/interfaces";
 import type { RcEncryptionNonce, U32, U64 } from "@umbra-privacy/sdk/types";
+import type { QueryUserAccountResult } from "@umbra-privacy/sdk/types";
 import { generateRandomNonce } from "@umbra-privacy/sdk/utils";
 import {
   getClaimReceiverClaimableUtxoIntoEncryptedBalanceProver,
   getCreateReceiverClaimableUtxoFromPublicBalanceProver,
+  getUserRegistrationProver,
 } from "@umbra-privacy/web-zk-prover";
 import { address } from "@solana/kit";
 
-type DueVaultNetwork = "mainnet" | "devnet";
+import { getProxiedUmbraZkAssetProvider } from "@/lib/umbra/zk-assets";
 
-type DueVaultConfig = {
+export type DueVaultNetwork = "mainnet" | "devnet";
+
+export type DueVaultConfig = {
   network: DueVaultNetwork;
   rpcUrl: string;
   rpcSubscriptionsUrl: string;
   signer: IUmbraSigner;
+  deferMasterSeedSignature?: boolean;
+  preferPollingTransactionForwarder?: boolean;
   indexerApiEndpoint?: string;
   relayerApiEndpoint?: string;
 };
@@ -72,23 +82,64 @@ export const UMBRA_MAINNET_MINTS = {
 } as const;
 
 export async function createDueVaultClient(config: DueVaultConfig) {
-  return getUmbraClient({
-    signer: config.signer,
-    network: config.network,
-    rpcUrl: config.rpcUrl,
-    rpcSubscriptionsUrl: config.rpcSubscriptionsUrl,
-    indexerApiEndpoint: config.indexerApiEndpoint ?? DEFAULT_INDEXER_ENDPOINT,
-  });
+  return getUmbraClient(
+    {
+      signer: config.signer,
+      network: config.network,
+      rpcUrl: config.rpcUrl,
+      rpcSubscriptionsUrl: config.rpcSubscriptionsUrl,
+      deferMasterSeedSignature: config.deferMasterSeedSignature,
+      indexerApiEndpoint: config.indexerApiEndpoint ?? DEFAULT_INDEXER_ENDPOINT,
+    },
+    config.preferPollingTransactionForwarder
+      ? {
+          transactionForwarder: getPollingTransactionForwarder({
+            rpcUrl: config.rpcUrl,
+          }),
+        }
+      : undefined,
+  );
 }
 
-export async function registerDueVaultUser(config: DueVaultConfig) {
+export async function registerDueVaultUser(
+  config: DueVaultConfig,
+  options: UserRegistrationOptions = {},
+) {
   const client = await createDueVaultClient(config);
-  const register = getUserRegistrationFunction({ client });
+  const zkProver = getUserRegistrationProver(
+    typeof window === "undefined"
+      ? undefined
+      : {
+          assetProvider: getProxiedUmbraZkAssetProvider(),
+        },
+  );
+  const register = getUserRegistrationFunction({ client }, { zkProver });
 
   return register({
+    ...options,
     confidential: true,
     anonymous: true,
   });
+}
+
+export async function queryDueVaultUserRegistration(
+  config: DueVaultConfig,
+  userAddress?: string,
+) {
+  const client = await createDueVaultClient(config);
+  const queryUser = getUserAccountQuerierFunction({ client });
+
+  return queryUser(toAddress(userAddress ?? client.signer.address));
+}
+
+export function isUmbraUserFullyRegistered(account: QueryUserAccountResult) {
+  return (
+    account.state === "exists" &&
+    account.data.isInitialised &&
+    account.data.isUserAccountX25519KeyRegistered &&
+    account.data.isUserCommitmentRegistered &&
+    account.data.isActiveForAnonymousUsage
+  );
 }
 
 export async function depositPrivateBalance(

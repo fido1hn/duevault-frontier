@@ -4,9 +4,13 @@ import { DEFAULT_PROFILE_NOTES } from "@/features/merchant-profiles/constants";
 import { serializeMerchantProfile } from "@/features/merchant-profiles/mappers";
 import {
   findMerchantProfileByUserId,
+  updateMerchantUmbraRegistrationRecord,
   upsertMerchantProfileRecord,
 } from "@/features/merchant-profiles/repository";
-import type { UpsertMerchantProfileInput } from "@/features/merchant-profiles/types";
+import type {
+  SaveUmbraRegistrationInput,
+  UpsertMerchantProfileInput,
+} from "@/features/merchant-profiles/types";
 import type { AuthContext } from "@/server/auth";
 import {
   assertInvoiceMint,
@@ -14,6 +18,7 @@ import {
   assertPrivacyRail,
   sanitizeContactEmail,
   sanitizeRequired,
+  sanitizeSaveUmbraRegistrationInput,
   sanitizeWalletAddress,
 } from "@/features/merchant-profiles/validators";
 
@@ -67,6 +72,52 @@ export async function upsertMerchantProfile(
     privacyRail,
     onboardingCompletedAt: new Date(),
   });
+
+  return serializeMerchantProfile(profile);
+}
+
+function assertReadyUmbraAccount(input: SaveUmbraRegistrationInput) {
+  if (
+    input.account.state !== "exists" ||
+    !input.account.isInitialised ||
+    !input.account.isUserAccountX25519KeyRegistered ||
+    !input.account.isUserCommitmentRegistered ||
+    !input.account.isActiveForAnonymousUsage
+  ) {
+    throw new Error("Umbra registration is not fully ready.");
+  }
+}
+
+export async function saveMerchantUmbraRegistration(
+  authContext: AuthContext,
+  input: SaveUmbraRegistrationInput,
+) {
+  const merchantProfile = authContext.merchantProfile;
+
+  if (!merchantProfile) {
+    throw new Error("Merchant profile setup is required.");
+  }
+
+  const sanitized = sanitizeSaveUmbraRegistrationInput(input);
+
+  if (sanitized.walletAddress !== merchantProfile.primaryWallet.address) {
+    throw new Error("Umbra wallet must match the merchant profile wallet.");
+  }
+
+  assertReadyUmbraAccount(sanitized);
+
+  const now = new Date();
+  const profile = await updateMerchantUmbraRegistrationRecord(
+    merchantProfile.id,
+    {
+      network: sanitized.network,
+      status: "ready",
+      walletAddress: sanitized.walletAddress,
+      signatures: sanitized.signatures,
+      registeredAt: merchantProfile.umbraRegisteredAt ?? now,
+      lastCheckedAt: now,
+    },
+  );
 
   return serializeMerchantProfile(profile);
 }

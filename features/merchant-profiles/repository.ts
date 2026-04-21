@@ -7,6 +7,10 @@ import type {
   PaymentRail,
   PrivacyRail,
 } from "@/features/invoices/types";
+import type {
+  UmbraNetwork,
+  UmbraRegistrationStatus,
+} from "@/features/merchant-profiles/types";
 
 const merchantProfileInclude = {
   primaryWallet: true,
@@ -29,10 +33,39 @@ export type UpsertMerchantProfileRecordInput = {
   onboardingCompletedAt: Date;
 };
 
+export type UpdateMerchantUmbraRegistrationRecordInput = {
+  network: UmbraNetwork;
+  status: Extract<UmbraRegistrationStatus, "ready">;
+  walletAddress: string;
+  signatures: string[];
+  registeredAt: Date;
+  lastCheckedAt: Date;
+};
+
 export async function findMerchantProfileByUserId(userId: string) {
   return db.merchantProfile.findUnique({
     where: {
       userId,
+    },
+    include: merchantProfileInclude,
+  });
+}
+
+export async function updateMerchantUmbraRegistrationRecord(
+  merchantProfileId: string,
+  input: UpdateMerchantUmbraRegistrationRecordInput,
+) {
+  return db.merchantProfile.update({
+    where: {
+      id: merchantProfileId,
+    },
+    data: {
+      umbraNetwork: input.network,
+      umbraStatus: input.status,
+      umbraRegisteredAt: input.registeredAt,
+      umbraWalletAddress: input.walletAddress,
+      umbraRegistrationSignatures: input.signatures,
+      umbraLastCheckedAt: input.lastCheckedAt,
     },
     include: merchantProfileInclude,
   });

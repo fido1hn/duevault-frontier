@@ -6,9 +6,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { GetAuthToken } from "@/features/auth/client";
 import {
   getMerchantProfileClient,
+  saveUmbraRegistrationClient,
   upsertMerchantProfileClient,
 } from "@/features/merchant-profiles/client";
-import type { UpsertMerchantProfileInput } from "@/features/merchant-profiles/types";
+import type {
+  SaveUmbraRegistrationInput,
+  UpsertMerchantProfileInput,
+} from "@/features/merchant-profiles/types";
 import { queryKeys } from "@/features/query/keys";
 
 type UseMerchantProfileQueryOptions = {
@@ -40,6 +44,22 @@ export function useUpsertMerchantProfileMutation() {
   return useMutation({
     mutationFn: (input: UpsertMerchantProfileInput) =>
       upsertMerchantProfileClient(input, getAccessToken),
+    onSuccess: (profile) => {
+      queryClient.setQueryData(queryKeys.merchantProfile, profile);
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.merchantProfile,
+      });
+    },
+  });
+}
+
+export function useSaveUmbraRegistrationMutation() {
+  const { getAccessToken } = usePrivy();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: SaveUmbraRegistrationInput) =>
+      saveUmbraRegistrationClient(input, getAccessToken),
     onSuccess: (profile) => {
       queryClient.setQueryData(queryKeys.merchantProfile, profile);
       void queryClient.invalidateQueries({
