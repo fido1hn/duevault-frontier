@@ -2,12 +2,10 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState } from "react";
-import { toast } from "sonner";
 import {
   ArrowLeft,
-  ArrowRight,
   CheckCircle2,
+  Clock,
   ExternalLink,
   Lock,
   ShieldCheck,
@@ -15,45 +13,84 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { business, getInvoiceById } from "@/fixtures/demo-data";
+import { useInvoiceQuery } from "@/features/invoices/queries";
+import { getPaymentMintConfig } from "@/features/payments/mints";
+
+function truncate(value: string) {
+  return `${value.slice(0, 8)}...${value.slice(-8)}`;
+}
 
 export default function SettlementPage() {
   const params = useParams<{ invoiceId: string }>();
-  const invoice = getInvoiceById(params.invoiceId);
-  const [step, setStep] = useState(1);
-
-  function handleClaim() {
-    setStep(2);
-    window.setTimeout(() => {
-      setStep(3);
-      toast.success(`Settlement successful. ${invoice.amount} claimed.`);
-    }, 2500);
-  }
+  const invoiceQuery = useInvoiceQuery(params.invoiceId);
+  const invoice = invoiceQuery.data ?? null;
+  const latestUmbraPayment = invoice?.latestUmbraPayment ?? null;
+  const mint = invoice ? getPaymentMintConfig(invoice.mint) : null;
+  const isConfirmed = latestUmbraPayment?.status === "confirmed";
+  const isSubmitted = latestUmbraPayment?.status === "submitted";
+  const error = invoiceQuery.isError
+    ? invoiceQuery.error instanceof Error
+      ? invoiceQuery.error.message
+      : "Unable to load settlement details."
+    : "";
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-8 p-6 md:p-8">
-        <Button asChild variant="ghost" size="sm" className="w-fit pl-0 text-muted-foreground">
-          <Link href={`/invoices/${invoice.id}`}>
-            <ArrowLeft className="size-4" /> Back to Invoice
-          </Link>
-        </Button>
+      <Button asChild variant="ghost" size="sm" className="w-fit pl-0 text-muted-foreground">
+        <Link href={invoice ? `/invoices/${invoice.id}` : "/invoices"}>
+          <ArrowLeft className="size-4" /> Back to Invoice
+        </Link>
+      </Button>
 
-        <header>
-          <h1 className="font-serif text-3xl font-semibold tracking-tight text-foreground">
-            Private Settlement
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Claim payments sent to your stealth addresses via Umbra Protocol.
-          </p>
-        </header>
+      <header>
+        <h1 className="font-serif text-3xl font-semibold tracking-tight text-foreground">
+          Private Settlement
+        </h1>
+        <p className="mt-1 text-muted-foreground">
+          Review real Umbra payment state before moving funds into the merchant
+          settlement workflow.
+        </p>
+      </header>
 
+      {invoiceQuery.isPending && (
+        <Card className="border-card-border shadow-sm">
+          <CardContent className="p-8 text-center">
+            <h2 className="font-serif text-2xl font-semibold">Loading settlement</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Fetching invoice and Umbra payment details.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {!invoiceQuery.isPending && error && (
+        <Card className="border-card-border shadow-sm">
+          <CardContent className="p-8 text-center">
+            <h2 className="font-serif text-2xl font-semibold">Settlement unavailable</h2>
+            <p className="mt-2 text-sm text-muted-foreground">{error}</p>
+            <Button asChild className="mt-6">
+              <Link href="/invoices">Review invoices</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {!invoiceQuery.isPending && !error && invoice && (
         <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
           <div className="flex flex-col gap-6 md:col-span-2">
             <Card className="overflow-hidden border-card-border">
               <div className="flex items-center gap-3 border-b border-card-border bg-[var(--status-claimed-bg)]/20 px-6 py-4">
-                <ShieldCheck className="size-5 text-[var(--status-claimed)]" />
-                <h2 className="font-medium text-[var(--status-claimed)]">
-                  Stealth Payment Detected
+                {isConfirmed ? (
+                  <CheckCircle2 className="size-5 text-[var(--status-claimed)]" />
+                ) : (
+                  <ShieldCheck className="size-5 text-[var(--status-pending)]" />
+                )}
+                <h2 className="font-medium text-foreground">
+                  {isConfirmed
+                    ? "Umbra Payment Confirmed"
+                    : isSubmitted
+                      ? "Umbra Payment Submitted"
+                      : "No Claimable Payment Confirmed"}
                 </h2>
               </div>
               <CardContent className="p-6">
@@ -72,61 +109,67 @@ export default function SettlementPage() {
 
                 <div className="mb-6 flex flex-col gap-2 break-all rounded-lg border border-border bg-muted/10 p-4 font-mono text-xs text-muted-foreground">
                   <div className="flex justify-between gap-3">
-                    <span>Sender:</span>
-                    <span className="text-foreground">{invoice.client} (Public)</span>
+                    <span>Customer:</span>
+                    <span className="text-foreground">{invoice.client}</span>
                   </div>
                   <div className="flex justify-between gap-3">
                     <span>Receiver:</span>
-                    <span className="text-foreground">{business.stealthAddress}</span>
+                    <span className="text-foreground">
+                      {latestUmbraPayment?.merchantUmbraWalletAddress ??
+                        invoice.merchantUmbraWalletAddress ??
+                        "Not available"}
+                    </span>
                   </div>
                   <div className="flex justify-between gap-3">
                     <span>Network:</span>
-                    <span>Solana Mainnet</span>
+                    <span>{invoice.merchantUmbraNetwork}</span>
                   </div>
                   <div className="flex justify-between gap-3">
-                    <span>Tx Hash:</span>
+                    <span>Asset:</span>
+                    <span>{mint?.displayName ?? invoice.mint}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span>Payment Tx:</span>
                     <span className="text-foreground">
-                      5KJyTr...vB9Fg3x <ExternalLink className="ml-1 inline size-3" />
+                      {latestUmbraPayment ? (
+                        <>
+                          {truncate(latestUmbraPayment.createUtxoSignature)}
+                          <ExternalLink className="ml-1 inline size-3" />
+                        </>
+                      ) : (
+                        "Not submitted"
+                      )}
                     </span>
                   </div>
                 </div>
 
-                {step === 1 && (
-                  <Button size="lg" className="h-14 w-full text-base" onClick={handleClaim}>
-                    <Lock className="size-4" /> Claim to Private Balance
-                  </Button>
-                )}
-
-                {step === 2 && (
-                  <Button size="lg" disabled className="h-14 w-full bg-muted text-base text-muted-foreground">
-                    <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                    Generating Proof & Claiming...
-                  </Button>
-                )}
-
-                {step === 3 && (
+                {isConfirmed && (
                   <div className="flex items-start gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4">
                     <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" />
                     <div>
                       <h3 className="font-medium text-emerald-800 dark:text-emerald-400">
-                        Settlement Complete
+                        Merchant Claimability Confirmed
                       </h3>
                       <p className="mt-1 text-sm text-emerald-700/80 dark:text-emerald-500/80">
-                        Funds were swept to your treasury without exposing the link
-                        between the sender and your identity.
+                        The merchant wallet has confirmed this payment is claimable.
+                        Settlement execution can be layered on this verified state.
                       </p>
-                      <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="mt-3 border-emerald-500/30 bg-transparent text-emerald-700 hover:bg-emerald-500/10"
-                      >
-                        <Link href="/proofs">
-                          Generate Auditor Proof <ArrowRight className="size-3" />
-                        </Link>
-                      </Button>
                     </div>
                   </div>
+                )}
+
+                {isSubmitted && (
+                  <Button asChild size="lg" className="h-14 w-full text-base">
+                    <Link href={`/invoices/${invoice.id}`}>
+                      <ShieldCheck className="size-4" /> Confirm On Invoice Detail
+                    </Link>
+                  </Button>
+                )}
+
+                {!latestUmbraPayment && (
+                  <Button size="lg" disabled className="h-14 w-full text-base">
+                    <Clock className="size-4" /> Awaiting Customer Payment
+                  </Button>
                 )}
               </CardContent>
             </Card>
@@ -140,16 +183,16 @@ export default function SettlementPage() {
               <div className="relative flex flex-col gap-4 text-sm text-muted-foreground before:absolute before:inset-y-0 before:left-[11px] before:w-px before:bg-border">
                 {[
                   [
-                    "Payment Sent",
-                    "Client pays to a unique stealth address generated just for this invoice.",
+                    "Submission",
+                    "The customer submits verified Umbra transaction evidence for this invoice.",
                   ],
                   [
-                    "Detection",
-                    "DueVault monitors Umbra announcements and detects the payment using your viewing key.",
+                    "Confirmation",
+                    "The merchant wallet scans for the matching claimable payment.",
                   ],
                   [
-                    "Claiming",
-                    "You claim the funds. The footprint shows a transfer from a stealth address, not the client.",
+                    "Settlement",
+                    "Only confirmed claimability is used for production settlement state.",
                   ],
                 ].map(([title, body], index) => (
                   <div key={title} className="relative pl-8">
@@ -164,6 +207,7 @@ export default function SettlementPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
+      )}
+    </div>
   );
 }

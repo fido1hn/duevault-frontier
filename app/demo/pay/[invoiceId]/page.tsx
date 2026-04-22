@@ -8,10 +8,26 @@ import {
   type CheckoutPaymentLineItem,
   type CheckoutPaymentViewModel,
 } from "@/features/checkout/service";
-import { business, formatUsdc, invoices } from "@/fixtures/demo-data";
 import { getPaymentMintConfig } from "@/features/payments/mints";
 
 export const dynamic = "force-dynamic";
+
+const DEMO_BUSINESS = {
+  name: "North Pier Studio",
+};
+
+const DEMO_INVOICE = {
+  id: "DV-1007",
+  client: "Atlas Labs",
+  dueLong: "April 30, 2026",
+  amountNumber: 2450,
+  status: "Sent",
+  lineItems: [
+    { id: "1", description: "Product strategy sprint", quantity: 1, price: 1600 },
+    { id: "2", description: "Umbra integration advisory", quantity: 1, price: 650 },
+    { id: "3", description: "Compliance proof packet", quantity: 1, price: 200 },
+  ],
+} as const;
 
 type DemoPayPageProps = {
   params: Promise<{
@@ -19,53 +35,47 @@ type DemoPayPageProps = {
   }>;
 };
 
-type DemoInvoice = (typeof invoices)[number];
+function formatDemoAmount(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 0,
+  }).format(value);
+}
 
 function demoInvoiceLineItems(
-  invoice: DemoInvoice,
   mintDisplayName: string,
 ): CheckoutPaymentLineItem[] {
-  return invoice.lineItems.map((item) => ({
-    id: String(item.id),
+  return DEMO_INVOICE.lineItems.map((item) => ({
+    id: item.id,
     description: item.description,
     quantity: item.quantity,
-    amountDisplay: `${formatUsdc(item.quantity * item.price)} ${mintDisplayName}`,
+    amountDisplay: `${formatDemoAmount(item.quantity * item.price)} ${mintDisplayName}`,
   }));
 }
 
-function findDemoInvoice(invoiceId: string) {
-  return (
-    invoices.find(
-      (invoice) => invoice.id.toLowerCase() === invoiceId.toLowerCase(),
-    ) ?? null
-  );
-}
-
-function buildDemoCheckoutViewModel(
-  invoice: DemoInvoice,
-): CheckoutPaymentViewModel {
+function buildDemoCheckoutViewModel(): CheckoutPaymentViewModel {
   const paymentConfig = getCheckoutPaymentConfig();
   const mint = paymentConfig.mint ?? getPaymentMintConfig("USDC");
-  const memo = `DueVault invoice ${invoice.id}`;
-  const label = business.name;
-  const message = `Payment for invoice ${invoice.id}`;
-  const solanaPayUrl = paymentConfig.isConfigured && paymentConfig.mint
-    ? buildSolanaPayUrl({
-        amountNumber: invoice.amountNumber,
-        label,
-        memo,
-        message,
-        receiverAddress: paymentConfig.receiverAddress,
-        mintAddress: paymentConfig.mint.address,
-      })
-    : null;
+  const memo = `DueVault invoice ${DEMO_INVOICE.id}`;
+  const label = DEMO_BUSINESS.name;
+  const message = `Payment for invoice ${DEMO_INVOICE.id}`;
+  const solanaPayUrl =
+    paymentConfig.isConfigured && paymentConfig.mint
+      ? buildSolanaPayUrl({
+          amountNumber: DEMO_INVOICE.amountNumber,
+          label,
+          memo,
+          message,
+          receiverAddress: paymentConfig.receiverAddress,
+          mintAddress: paymentConfig.mint.address,
+        })
+      : null;
 
   return {
     publicId: null,
-    invoiceNumber: invoice.id,
-    merchantName: business.name,
-    amountNumber: invoice.amountNumber,
-    amountDisplay: `${formatUsdc(invoice.amountNumber)} ${mint.displayName}`,
+    invoiceNumber: DEMO_INVOICE.id,
+    merchantName: DEMO_BUSINESS.name,
+    amountNumber: DEMO_INVOICE.amountNumber,
+    amountDisplay: `${formatDemoAmount(DEMO_INVOICE.amountNumber)} ${mint.displayName}`,
     amountAtomic: null,
     mint: mint.id,
     mintAddress: paymentConfig.mint?.address ?? null,
@@ -73,8 +83,8 @@ function buildDemoCheckoutViewModel(
     mintDecimals: mint.decimals,
     isTestMint: mint.isTestMint,
     mintNotice: mint.testnetNotice,
-    dueLong: invoice.dueLong,
-    lineItems: demoInvoiceLineItems(invoice, mint.displayName),
+    dueLong: DEMO_INVOICE.dueLong,
+    lineItems: demoInvoiceLineItems(mint.displayName),
     receiverAddress: paymentConfig.isConfigured
       ? paymentConfig.receiverAddress
       : null,
@@ -86,7 +96,7 @@ function buildDemoCheckoutViewModel(
     privacyRail: "none",
     paymentMode: "solana_pay",
     statusEndpoint: null,
-    paymentStatus: mapCheckoutPaymentStatus(invoice.status),
+    paymentStatus: mapCheckoutPaymentStatus(DEMO_INVOICE.status),
     configurationError: paymentConfig.isConfigured ? null : paymentConfig.error,
     umbra: null,
   };
@@ -94,13 +104,12 @@ function buildDemoCheckoutViewModel(
 
 export default async function DemoPayPage({ params }: DemoPayPageProps) {
   const { invoiceId } = await params;
-  const invoice = findDemoInvoice(invoiceId);
 
-  if (!invoice) {
+  if (invoiceId.toLowerCase() !== DEMO_INVOICE.id.toLowerCase()) {
     notFound();
   }
 
-  const checkout = buildDemoCheckoutViewModel(invoice);
+  const checkout = buildDemoCheckoutViewModel();
 
   return <CheckoutQrPayment checkout={checkout} />;
 }

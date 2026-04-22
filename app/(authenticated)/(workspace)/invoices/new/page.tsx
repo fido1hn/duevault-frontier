@@ -42,6 +42,17 @@ function formatPaymentAmount(value: number, decimals: number) {
   }).format(value);
 }
 
+function toDateInputValue(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function getDefaultDueDate() {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + 30);
+
+  return toDateInputValue(date);
+}
+
 export default function NewInvoicePage() {
   return <NewInvoiceContent />;
 }
@@ -54,17 +65,16 @@ function NewInvoiceContent() {
   );
   const router = useRouter();
   const createInvoice = useCreateInvoiceMutation();
-  const [clientName, setClientName] = useState("Atlas Labs");
-  const [clientEmail, setClientEmail] = useState("billing@atlaslabs.io");
-  const [invoiceNumber, setInvoiceNumber] = useState("DV-1007");
-  const [issuedAt, setIssuedAt] = useState("2026-04-01");
-  const [dueAt, setDueAt] = useState("2026-04-30");
+  const [clientName, setClientName] = useState("");
+  const [clientEmail, setClientEmail] = useState("");
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [issuedAt, setIssuedAt] = useState(() => toDateInputValue(new Date()));
+  const [dueAt, setDueAt] = useState(getDefaultDueDate);
   const [notes, setNotes] = useState(profile.defaultNotes);
   const [paymentRail, setPaymentRail] = useState<PaymentRail>(profile.paymentRail);
   const [privacyRail, setPrivacyRail] = useState<PrivacyRail>(profile.privacyRail);
   const [lineItems, setLineItems] = useState<EditableLineItem[]>([
-    { id: 1, description: "Product strategy sprint", quantity: 1, price: "1600" },
-    { id: 2, description: "Umbra integration advisory", quantity: 1, price: "650" },
+    { id: 1, description: "", quantity: 1, price: "0" },
   ]);
   const [submitError, setSubmitError] = useState("");
   const isSubmitting = createInvoice.isPending;

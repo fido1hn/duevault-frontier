@@ -86,7 +86,7 @@ export function WaitlistForm({ source = "homepage" }: WaitlistFormProps) {
           <Input
             id="waitlist-name"
             autoComplete="name"
-            placeholder="Ada from North Pier"
+            placeholder="Your name"
             value={name}
             onChange={(event) => setName(event.target.value)}
           />
@@ -96,7 +96,7 @@ export function WaitlistForm({ source = "homepage" }: WaitlistFormProps) {
           <Input
             id="waitlist-company"
             autoComplete="organization"
-            placeholder="North Pier Studio"
+            placeholder="Your company"
             value={company}
             onChange={(event) => setCompany(event.target.value)}
           />

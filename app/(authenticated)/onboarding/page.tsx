@@ -229,7 +229,7 @@ function OnboardingContent() {
                   <Input
                     value={businessName}
                     onChange={(event) => setBusinessName(event.target.value)}
-                    placeholder="North Pier Studio"
+                    placeholder="Your company"
                   />
                 </div>
                 <div className="flex flex-col gap-2">

@@ -113,7 +113,6 @@ Checkout mint envs:
 - `features/`: vertical feature slices for invoices, merchant profiles, payment intents, waitlist, and checkout
 - `server/auth.ts`: server-only Privy access token verification and user/wallet sync
 - `server/db.ts`: server-only Prisma client singleton
-- `fixtures/`: demo data used by prototype-only screens
 - `lib/`: shared utilities, formatting, and brand constants
 - `lib/umbra/`: Umbra boundary, placeholders, and future SDK integration
 - `prisma/schema.prisma`: Prisma source of truth for app tables
