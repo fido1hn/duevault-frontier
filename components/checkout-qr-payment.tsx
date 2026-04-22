@@ -17,13 +17,17 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { CheckoutUmbraPayment } from "@/components/checkout-umbra-payment";
 import { Separator } from "@/components/ui/separator";
 import {
   mapCheckoutPaymentStatus,
   type CheckoutPaymentStatus,
 } from "@/features/checkout/status";
 import type { CheckoutPaymentViewModel } from "@/features/checkout/service";
-import type { InvoiceStatus } from "@/features/invoices/types";
+import type {
+  InvoiceStatus,
+  PublicUmbraPaymentStatus,
+} from "@/features/invoices/types";
 
 const CheckoutQrCode = dynamic(() => import("@/components/checkout-qr-code"), {
   ssr: false,
@@ -39,6 +43,7 @@ type InvoiceStatusResponse = {
     publicId: string;
     invoiceNumber: string;
     status: InvoiceStatus;
+    latestUmbraPayment: PublicUmbraPaymentStatus | null;
   };
   error?: string;
 };
@@ -155,12 +160,17 @@ function PaymentStatusPanel({
 
 export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
   const [paymentStatus, setPaymentStatus] = useState(checkout.paymentStatus);
+  const [latestUmbraPayment, setLatestUmbraPayment] =
+    useState<PublicUmbraPaymentStatus | null>(
+      checkout.umbra?.latestPayment ?? null,
+    );
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
 
   useEffect(() => {
     setPaymentStatus(checkout.paymentStatus);
-  }, [checkout.paymentStatus]);
+    setLatestUmbraPayment(checkout.umbra?.latestPayment ?? null);
+  }, [checkout.paymentStatus, checkout.umbra?.latestPayment]);
 
   async function refreshPaymentStatus({ quiet = false } = {}) {
     if (!checkout.statusEndpoint) return;
@@ -179,7 +189,13 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
         throw new Error(payload.error ?? "Unable to refresh payment status.");
       }
 
-      setPaymentStatus(mapCheckoutPaymentStatus(payload.invoice.status));
+      setPaymentStatus(
+        mapCheckoutPaymentStatus(
+          payload.invoice.status,
+          payload.invoice.latestUmbraPayment ?? null,
+        ),
+      );
+      setLatestUmbraPayment(payload.invoice.latestUmbraPayment ?? null);
       setLastChecked(new Date());
     } catch (error) {
       if (!quiet) {
@@ -231,7 +247,9 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
             D
           </div>
           <p className="mb-1 text-sm font-medium tracking-wider text-slate-500 uppercase">
-            Invoice {checkout.invoiceNumber}
+            {checkout.source === "payment_intent"
+              ? "Payment Request"
+              : `Invoice ${checkout.invoiceNumber}`}
           </p>
           <h1 className="font-serif text-2xl text-slate-900">
             {checkout.merchantName}
@@ -277,6 +295,15 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
               statusEndpoint={checkout.statusEndpoint}
             />
 
+            {!checkout.configurationError && checkout.mintNotice && (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                  <p>{checkout.mintNotice}</p>
+                </div>
+              </div>
+            )}
+
             {checkout.configurationError ? (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
                 <div className="flex items-start gap-3">
@@ -289,6 +316,21 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
                   </div>
                 </div>
               </div>
+            ) : checkout.paymentMode === "umbra" && checkout.umbra ? (
+              <CheckoutUmbraPayment
+                amountDisplay={checkout.amountDisplay}
+                mint={checkout.mintDisplayName}
+                umbra={{
+                  ...checkout.umbra,
+                  latestPayment: latestUmbraPayment,
+                }}
+                onPaymentSaved={(payment, status) => {
+                  setLatestUmbraPayment(payment);
+                  setPaymentStatus(mapCheckoutPaymentStatus(status, payment));
+                  setLastChecked(new Date());
+                }}
+                onStatusRefresh={() => void refreshPaymentStatus({ quiet: true })}
+              />
             ) : (
               <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-center">
                 <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500 shadow-sm">
@@ -334,7 +376,7 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
                   <p className="text-xs font-medium text-slate-500">Amount</p>
                   <div className="mt-2 flex items-center justify-between gap-3">
                     <p className="font-mono text-sm text-slate-900">
-                      {checkout.amountNumber} {checkout.mint}
+                      {checkout.amountNumber} {checkout.mintDisplayName}
                     </p>
                     <Button
                       type="button"
@@ -343,7 +385,7 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
                       onClick={() =>
                         copyValue(
                           "Amount",
-                          `${checkout.amountNumber} ${checkout.mint}`,
+                          `${checkout.amountNumber} ${checkout.mintDisplayName}`,
                         )
                       }
                     >
@@ -355,7 +397,9 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
 
                 <div className="rounded-lg border border-slate-100 bg-white p-4">
                   <p className="text-xs font-medium text-slate-500">
-                    Invoice memo
+                    {checkout.source === "payment_intent"
+                      ? "Payment memo"
+                      : "Invoice memo"}
                   </p>
                   <div className="mt-2 flex items-center justify-between gap-3">
                     <p className="font-mono text-sm text-slate-900">
@@ -365,7 +409,14 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
                       type="button"
                       variant="outline"
                       size="sm"
-                      onClick={() => copyValue("Invoice memo", checkout.memo)}
+                      onClick={() =>
+                        copyValue(
+                          checkout.source === "payment_intent"
+                            ? "Payment memo"
+                            : "Invoice memo",
+                          checkout.memo,
+                        )
+                      }
                     >
                       <Copy className="size-3.5" />
                       Copy
@@ -379,16 +430,17 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
               <Shield className="mt-0.5 size-5 shrink-0 text-slate-400" />
               <div className="text-xs leading-relaxed text-slate-500">
                 <p className="mb-1 font-medium text-slate-700">
-                  Private settlement via Umbra
+                  {checkout.paymentMode === "umbra"
+                    ? "Private settlement via Umbra"
+                    : "Direct Solana Pay"}
                 </p>
-                This QR currently points to the configured checkout receiver for
-                this invoice. The next Umbra integration slice will replace it
-                with a per-invoice private payment destination while preserving
-                invoice-specific proof.
+                {checkout.paymentMode === "umbra"
+                  ? "This payment uses the merchant's Umbra receiver for private settlement."
+                  : "This QR points to the merchant payment receiver for this checkout."}
               </div>
             </div>
 
-            {!checkout.configurationError && (
+            {!checkout.configurationError && checkout.paymentMode === "solana_pay" && (
               <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
                 <CheckCircle2 className="size-4 text-emerald-600" />
                 No DueVault wallet connection required for the payer.

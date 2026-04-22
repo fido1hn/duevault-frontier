@@ -31,6 +31,8 @@ import { Textarea } from "@/components/ui/textarea";
 import type { PaymentRail, PrivacyRail } from "@/features/invoices/types";
 import { DEFAULT_PROFILE_NOTES } from "@/features/merchant-profiles/constants";
 import type { UpsertMerchantProfileInput } from "@/features/merchant-profiles/types";
+import { getConfiguredPaymentMint } from "@/features/payments/mints";
+import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 
 function OnboardingContent() {
   const router = useRouter();
@@ -41,6 +43,10 @@ function OnboardingContent() {
   const walletAddress = solanaWallets[0]?.address ?? null;
   const profileQuery = useMerchantProfileQuery();
   const upsertProfile = useUpsertMerchantProfileMutation();
+  const configuredMint = useMemo(
+    () => getConfiguredPaymentMint(getUmbraRuntimeConfig().network),
+    [],
+  );
   const [businessName, setBusinessName] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [businessAddress, setBusinessAddress] = useState("");
@@ -86,7 +92,7 @@ function OnboardingContent() {
       contactEmail,
       businessAddress,
       defaultNotes,
-      defaultMint: "USDC",
+      defaultMint: configuredMint.id,
       paymentRail,
       privacyRail,
     };

@@ -4,11 +4,13 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  confirmUmbraInvoicePaymentClient,
   createInvoiceClient,
   getInvoiceClient,
   listInvoicesClient,
 } from "@/features/invoices/client";
 import type {
+  ConfirmUmbraInvoicePaymentInput,
   CreateInvoiceInput,
   SerializedInvoice,
 } from "@/features/invoices/types";
@@ -46,6 +48,20 @@ export function useCreateInvoiceMutation() {
   return useMutation({
     mutationFn: (input: CreateInvoiceInput) =>
       createInvoiceClient(input, getAccessToken),
+    onSuccess: (invoice) => {
+      queryClient.setQueryData(queryKeys.invoice(invoice.id), invoice);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.invoices });
+    },
+  });
+}
+
+export function useConfirmUmbraInvoicePaymentMutation(invoiceId: string) {
+  const { getAccessToken } = usePrivy();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: ConfirmUmbraInvoicePaymentInput) =>
+      confirmUmbraInvoicePaymentClient(invoiceId, input, getAccessToken),
     onSuccess: (invoice) => {
       queryClient.setQueryData(queryKeys.invoice(invoice.id), invoice);
       void queryClient.invalidateQueries({ queryKey: queryKeys.invoices });

@@ -1,8 +1,20 @@
+import { createHash } from "node:crypto";
 import { PublicKey } from "@solana/web3.js";
 import {
   mapCheckoutPaymentStatus,
   type CheckoutPaymentStatus,
 } from "@/features/checkout/status";
+import type { PrivacyRail } from "@/features/invoices/types";
+import type { PublicUmbraPaymentStatus } from "@/features/invoices/types";
+import type {
+  UmbraNetwork,
+  UmbraRegistrationStatus,
+} from "@/features/merchant-profiles/types";
+import {
+  getConfiguredPaymentMint,
+  type ResolvedPaymentMintConfig,
+} from "@/features/payments/mints";
+import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 
 export { mapCheckoutPaymentStatus };
 export type { CheckoutPaymentStatus };
@@ -14,14 +26,21 @@ export type CheckoutPaymentLineItem = {
   amountDisplay: string;
 };
 
-export type CheckoutPaymentSource = "database" | "demo";
+export type CheckoutPaymentSource = "database" | "payment_intent" | "demo";
 
 export type CheckoutPaymentViewModel = {
+  publicId: string | null;
   invoiceNumber: string;
   merchantName: string;
   amountNumber: number;
   amountDisplay: string;
+  amountAtomic: string | null;
   mint: string;
+  mintAddress: string | null;
+  mintDisplayName: string;
+  mintDecimals: number;
+  isTestMint: boolean;
+  mintNotice: string | null;
   dueLong: string;
   lineItems: CheckoutPaymentLineItem[];
   receiverAddress: string | null;
@@ -30,25 +49,46 @@ export type CheckoutPaymentViewModel = {
   label: string;
   message: string;
   source: CheckoutPaymentSource;
+  privacyRail: PrivacyRail;
+  paymentMode: "solana_pay" | "umbra";
   statusEndpoint: string | null;
   paymentStatus: CheckoutPaymentStatus;
   configurationError: string | null;
+  umbra: CheckoutUmbraPaymentViewModel | null;
+};
+
+export type CheckoutUmbraPaymentViewModel = {
+  publicId: string;
+  network: UmbraNetwork;
+  merchantStatus: UmbraRegistrationStatus;
+  merchantReady: boolean;
+  merchantWalletAddress: string | null;
+  amountAtomic: string;
+  mintAddress: string | null;
+  mintDisplayName: string;
+  mintDecimals: number;
+  isTestMint: boolean;
+  mintNotice: string | null;
+  optionalData: string;
+  latestPayment: PublicUmbraPaymentStatus | null;
 };
 
 type CheckoutPaymentConfig =
   | {
       isConfigured: true;
+      network: UmbraNetwork;
       receiverAddress: string;
-      usdcMint: string;
+      mint: ResolvedPaymentMintConfig;
     }
   | {
       isConfigured: false;
+      network: UmbraNetwork;
       error: string;
       receiverAddress: null;
-      usdcMint: string | null;
+      mint: ResolvedPaymentMintConfig | null;
     };
 
-const DEFAULT_DEVNET_USDC_MINT = "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU";
+export const CHECKOUT_UMBRA_OPTIONAL_DATA_PREFIX = "duevault:invoice:";
 
 function validatePublicKey(value: string, label: string) {
   try {
@@ -63,54 +103,62 @@ function formatSolanaPayAmount(amount: number) {
 }
 
 export function getCheckoutPaymentConfig(): CheckoutPaymentConfig {
+  const runtimeConfig = getUmbraRuntimeConfig();
   const receiverAddress = process.env.NEXT_PUBLIC_CHECKOUT_RECIPIENT_ADDRESS?.trim();
-  const configuredMint =
-    process.env.NEXT_PUBLIC_CHECKOUT_USDC_MINT?.trim() ??
-    DEFAULT_DEVNET_USDC_MINT;
-
-  let usdcMint: string;
+  let mint: ResolvedPaymentMintConfig;
 
   try {
-    usdcMint = validatePublicKey(configuredMint, "USDC mint");
+    mint = getConfiguredPaymentMint(runtimeConfig.network);
+    validatePublicKey(mint.address, `${mint.displayName} mint`);
   } catch (error) {
     return {
       isConfigured: false,
+      network: runtimeConfig.network,
       error:
         error instanceof Error
           ? error.message
-          : "USDC mint must be a valid Solana address.",
+          : "Checkout mint is not configured correctly.",
       receiverAddress: null,
-      usdcMint: null,
+      mint: null,
     };
   }
 
   if (!receiverAddress) {
     return {
       isConfigured: false,
+      network: runtimeConfig.network,
       error:
         "Payment address not configured. Add NEXT_PUBLIC_CHECKOUT_RECIPIENT_ADDRESS to enable QR checkout.",
       receiverAddress: null,
-      usdcMint,
+      mint,
     };
   }
 
   try {
     return {
       isConfigured: true,
+      network: runtimeConfig.network,
       receiverAddress: validatePublicKey(receiverAddress, "Payment address"),
-      usdcMint,
+      mint,
     };
   } catch (error) {
     return {
       isConfigured: false,
+      network: runtimeConfig.network,
       error:
         error instanceof Error
           ? error.message
           : "Payment address must be a valid Solana address.",
       receiverAddress: null,
-      usdcMint,
+      mint,
     };
   }
+}
+
+export function buildUmbraInvoiceOptionalData(publicId: string) {
+  return createHash("sha256")
+    .update(`${CHECKOUT_UMBRA_OPTIONAL_DATA_PREFIX}${publicId}`)
+    .digest("hex");
 }
 
 export function buildSolanaPayUrl({
@@ -119,18 +167,18 @@ export function buildSolanaPayUrl({
   memo,
   message,
   receiverAddress,
-  usdcMint,
+  mintAddress,
 }: {
   amountNumber: number;
   label: string;
   memo: string;
   message: string;
   receiverAddress: string;
-  usdcMint: string;
+  mintAddress: string;
 }) {
   const params = new URLSearchParams({
     amount: formatSolanaPayAmount(amountNumber),
-    "spl-token": usdcMint,
+    "spl-token": mintAddress,
     label,
     message,
     memo,

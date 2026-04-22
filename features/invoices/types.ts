@@ -4,6 +4,10 @@ import type {
   PAYMENT_RAILS,
   PRIVACY_RAILS,
 } from "@/features/invoices/constants";
+import type {
+  UmbraNetwork,
+  UmbraRegistrationStatus,
+} from "@/features/merchant-profiles/types";
 
 export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
 export type PaymentRail = (typeof PAYMENT_RAILS)[number];
@@ -23,6 +27,32 @@ export type SerializedInvoiceLineItem = {
   sortOrder: number;
 };
 
+export type SerializedUmbraInvoicePayment = {
+  id: string;
+  invoiceId: string;
+  merchantProfileId: string;
+  payerWalletAddress: string;
+  merchantUmbraWalletAddress: string;
+  network: UmbraNetwork;
+  mint: string;
+  amountAtomic: string;
+  status: "confirmed" | "failed" | "submitted";
+  optionalData: string;
+  closeProofAccountSignature: string | null;
+  createProofAccountSignature: string;
+  createUtxoSignature: string;
+  error: string | null;
+  confirmedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicUmbraPaymentStatus = {
+  status: SerializedUmbraInvoicePayment["status"];
+  confirmedAt: string | null;
+  createUtxoSignaturePreview: string | null;
+};
+
 export type SerializedInvoice = {
   id: string;
   invoiceId: string;
@@ -30,6 +60,9 @@ export type SerializedInvoice = {
   merchantProfileId: string;
   merchantName: string;
   merchantWalletAddress: string;
+  merchantUmbraNetwork: UmbraNetwork;
+  merchantUmbraStatus: UmbraRegistrationStatus;
+  merchantUmbraWalletAddress: string | null;
   invoiceNumber: string;
   client: string;
   clientEmail: string;
@@ -47,6 +80,7 @@ export type SerializedInvoice = {
   privacyRail: PrivacyRail;
   mint: InvoiceMint;
   lineItems: SerializedInvoiceLineItem[];
+  latestUmbraPayment: SerializedUmbraInvoicePayment | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -69,6 +103,18 @@ export type CreateInvoiceInput = {
   mint?: InvoiceMint;
   status?: InvoiceStatus;
   lineItems: CreateInvoiceLineItemInput[];
+};
+
+export type ConfirmUmbraInvoicePaymentInput = {
+  createUtxoSignature: string;
+  destinationAddress: string;
+  payerWalletAddress: string;
+  mint: string;
+  amountAtomic: string;
+  h1Hash: string;
+  h2Hash: string;
+  treeIndex: string;
+  insertionIndex: string;
 };
 
 export type InvoiceLineItemCreateData = {

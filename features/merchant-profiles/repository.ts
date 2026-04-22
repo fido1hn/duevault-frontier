@@ -51,6 +51,15 @@ export async function findMerchantProfileByUserId(userId: string) {
   });
 }
 
+export async function findMerchantProfileById(id: string) {
+  return db.merchantProfile.findUnique({
+    where: {
+      id,
+    },
+    include: merchantProfileInclude,
+  });
+}
+
 export async function updateMerchantUmbraRegistrationRecord(
   merchantProfileId: string,
   input: UpdateMerchantUmbraRegistrationRecordInput,

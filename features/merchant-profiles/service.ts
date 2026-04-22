@@ -1,6 +1,8 @@
 import "server-only";
 
 import { DEFAULT_PROFILE_NOTES } from "@/features/merchant-profiles/constants";
+import { getConfiguredPaymentMint } from "@/features/payments/mints";
+import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import { serializeMerchantProfile } from "@/features/merchant-profiles/mappers";
 import {
   findMerchantProfileByUserId,
@@ -52,7 +54,8 @@ export async function upsertMerchantProfile(
     input.businessAddress,
     "Business address",
   );
-  const defaultMint = input.defaultMint ?? "USDC";
+  const defaultMint =
+    input.defaultMint ?? getConfiguredPaymentMint(getUmbraRuntimeConfig().network).id;
   const paymentRail = input.paymentRail ?? "solana";
   const privacyRail = input.privacyRail ?? "umbra";
 

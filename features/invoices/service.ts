@@ -8,7 +8,13 @@ import {
   invoiceRecordExists,
   listInvoiceRecords,
 } from "@/features/invoices/repository";
+import { findMerchantProfileById } from "@/features/merchant-profiles/repository";
+import {
+  getConfiguredPaymentMint,
+  resolvePaymentMintForNetwork,
+} from "@/features/payments/mints";
 import type { CreateInvoiceInput } from "@/features/invoices/types";
+import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import {
   assertInvoiceMint,
   assertInvoiceStatus,
@@ -64,14 +70,41 @@ export async function createInvoice(
   const status = input.status ?? "Sent";
   const paymentRail = input.paymentRail ?? "solana";
   const privacyRail = input.privacyRail ?? "umbra";
-  const mint = input.mint ?? "USDC";
-  const lineItems = buildLineItems(input.lineItems);
-  const totalAmountAtomic = calculateTotalAtomic(lineItems);
+  const runtimeConfig = getUmbraRuntimeConfig();
+  const mint = input.mint ?? getConfiguredPaymentMint(runtimeConfig.network).id;
 
   assertInvoiceStatus(status);
   assertPaymentRail(paymentRail);
   assertPrivacyRail(privacyRail);
   assertInvoiceMint(mint);
+
+  const lineItems = buildLineItems(input.lineItems, mint);
+  const totalAmountAtomic = calculateTotalAtomic(lineItems);
+
+  if (privacyRail === "umbra") {
+    const merchantProfile = await findMerchantProfileById(merchantProfileId);
+
+    if (!merchantProfile) {
+      throw new Error("Merchant profile not found.");
+    }
+
+    if (
+      merchantProfile.umbraStatus !== "ready" ||
+      merchantProfile.umbraWalletAddress !== merchantProfile.primaryWallet.address
+    ) {
+      throw new Error(
+        "Set up Umbra for your merchant wallet before creating an Umbra invoice.",
+      );
+    }
+
+    if (merchantProfile.umbraNetwork !== runtimeConfig.network) {
+      throw new Error(
+        `Merchant Umbra setup is for ${merchantProfile.umbraNetwork}, but checkout is configured for ${runtimeConfig.network}.`,
+      );
+    }
+
+    resolvePaymentMintForNetwork(mint, merchantProfile.umbraNetwork);
+  }
 
   if (await invoiceRecordExists(merchantProfileId, invoiceNumber)) {
     throw new Error("An invoice with this number already exists.");

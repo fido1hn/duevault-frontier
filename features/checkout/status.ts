@@ -1,4 +1,7 @@
-import type { InvoiceStatus } from "@/features/invoices/types";
+import type {
+  InvoiceStatus,
+  PublicUmbraPaymentStatus,
+} from "@/features/invoices/types";
 
 export type CheckoutPaymentStatusTone =
   | "waiting"
@@ -17,7 +20,19 @@ export type CheckoutPaymentStatus = {
 
 export function mapCheckoutPaymentStatus(
   status: InvoiceStatus,
+  latestUmbraPayment?: PublicUmbraPaymentStatus | null,
 ): CheckoutPaymentStatus {
+  if (latestUmbraPayment?.status === "submitted") {
+    return {
+      rawStatus: status,
+      statusLabel: "Payment submitted",
+      statusDescription:
+        "The customer submitted Umbra payment evidence. The merchant still needs to confirm the claimable UTXO.",
+      statusTone: "pending",
+      statusStep: 2,
+    };
+  }
+
   if (status === "Detected") {
     return {
       rawStatus: status,

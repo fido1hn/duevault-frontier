@@ -1,11 +1,23 @@
-import { PAYMENT_INTENT_STATUSES } from "@/features/payment-intents/constants";
-import type { PaymentIntentStatus } from "@/features/payment-intents/types";
+import {
+  PAYMENT_INTENT_STATUSES,
+  SUPPORTED_MINTS,
+} from "@/features/payment-intents/constants";
+import type {
+  PaymentIntentStatus,
+  SupportedMint,
+} from "@/features/payment-intents/types";
 
 export function assertPaymentIntentStatus(
   value: string,
 ): asserts value is PaymentIntentStatus {
   if (!PAYMENT_INTENT_STATUSES.includes(value as PaymentIntentStatus)) {
     throw new Error("Invalid payment request status.");
+  }
+}
+
+export function assertSupportedMint(value: string): asserts value is SupportedMint {
+  if (!SUPPORTED_MINTS.includes(value as SupportedMint)) {
+    throw new Error("Unsupported payment request mint.");
   }
 }
 

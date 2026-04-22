@@ -1,15 +1,20 @@
 import type { PaymentIntentRecord } from "@/features/payment-intents/repository";
 import type { SerializedPaymentIntent } from "@/features/payment-intents/types";
-import { assertPaymentIntentStatus } from "@/features/payment-intents/validators";
+import {
+  assertPaymentIntentStatus,
+  assertSupportedMint,
+} from "@/features/payment-intents/validators";
 
 export function serializePaymentIntent(
   intent: PaymentIntentRecord,
 ): SerializedPaymentIntent {
   assertPaymentIntentStatus(intent.status);
+  assertSupportedMint(intent.mint);
 
   return {
     id: intent.id,
     merchantProfileId: intent.merchantProfileId,
+    merchantName: intent.merchantProfile.businessName,
     merchantWallet: intent.merchantProfile.primaryWallet.address,
     amountAtomic: intent.amountAtomic,
     mint: intent.mint,

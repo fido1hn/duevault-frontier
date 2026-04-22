@@ -58,6 +58,15 @@ export async function findPaymentIntentById(
   });
 }
 
+export async function findPublicPaymentIntentById(intentId: string) {
+  return db.paymentIntent.findUnique({
+    where: {
+      id: intentId,
+    },
+    include: paymentIntentInclude,
+  });
+}
+
 export async function createPaymentIntentRecord(
   input: CreatePaymentIntentRecordInput,
 ) {

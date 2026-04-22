@@ -21,6 +21,12 @@ const invoiceInclude = {
       primaryWallet: true,
     },
   },
+  umbraPayments: {
+    orderBy: {
+      createdAt: "desc",
+    },
+    take: 1,
+  },
 } satisfies Prisma.InvoiceInclude;
 
 export type InvoiceRecord = Prisma.InvoiceGetPayload<{

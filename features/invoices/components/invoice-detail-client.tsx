@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useStandardWallets } from "@privy-io/react-auth/solana";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -11,6 +12,7 @@ import {
   Download,
   ExternalLink,
   Eye,
+  Loader2,
   ShieldCheck,
 } from "lucide-react";
 
@@ -18,18 +20,31 @@ import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useInvoiceQuery } from "@/features/invoices/queries";
+import {
+  useConfirmUmbraInvoicePaymentMutation,
+  useInvoiceQuery,
+} from "@/features/invoices/queries";
+import { findMerchantClaimableUmbraPayment } from "@/features/merchant-profiles/umbra-claim-confirmation";
+import { getPaymentMintConfig } from "@/features/payments/mints";
 
 type InvoiceDetailClientProps = {
   invoiceId: string;
 };
 
+function truncateSignature(value: string) {
+  return `${value.slice(0, 8)}...${value.slice(-8)}`;
+}
+
 export function InvoiceDetailClient({
   invoiceId,
 }: InvoiceDetailClientProps) {
   const { profile } = useMerchantProfile();
+  const standardWallets = useStandardWallets();
   const invoiceQuery = useInvoiceQuery(invoiceId);
+  const confirmUmbraPayment =
+    useConfirmUmbraInvoicePaymentMutation(invoiceId);
   const invoice = invoiceQuery.data ?? null;
+  const mint = invoice ? getPaymentMintConfig(invoice.mint) : null;
   const error = invoiceQuery.isError
     ? invoiceQuery.error instanceof Error
       ? invoiceQuery.error.message
@@ -37,6 +52,10 @@ export function InvoiceDetailClient({
     : "";
   const isLoading = invoiceQuery.isPending;
   const [copied, setCopied] = useState(false);
+  const [confirmationError, setConfirmationError] = useState("");
+  const latestUmbraPayment = invoice?.latestUmbraPayment ?? null;
+  const isUmbraPaymentSubmitted = latestUmbraPayment?.status === "submitted";
+  const isUmbraPaymentConfirmed = latestUmbraPayment?.status === "confirmed";
 
   function handleCopyLink() {
     if (!invoice) return;
@@ -46,6 +65,40 @@ export function InvoiceDetailClient({
     setCopied(true);
     toast.success("Checkout link copied to clipboard");
     window.setTimeout(() => setCopied(false), 2000);
+  }
+
+  async function handleConfirmUmbraPayment() {
+    if (!invoice || !latestUmbraPayment) return;
+
+    setConfirmationError("");
+
+    try {
+      const claimableEvidence = await findMerchantClaimableUmbraPayment({
+        walletAddress: profile.walletAddress,
+        standardWallets: standardWallets.wallets,
+        expected: {
+          destinationAddress: latestUmbraPayment.merchantUmbraWalletAddress,
+          payerWalletAddress: latestUmbraPayment.payerWalletAddress,
+          mint: latestUmbraPayment.mint,
+          amountAtomic: latestUmbraPayment.amountAtomic,
+        },
+      });
+
+      await confirmUmbraPayment.mutateAsync({
+        createUtxoSignature: latestUmbraPayment.createUtxoSignature,
+        ...claimableEvidence,
+      });
+      toast.success("Umbra payment confirmed.");
+      void invoiceQuery.refetch();
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to confirm Umbra payment.";
+
+      setConfirmationError(message);
+      toast.error(message);
+    }
   }
 
   return (
@@ -154,7 +207,7 @@ export function InvoiceDetailClient({
                             <td className="py-3 text-right">{item.quantity}</td>
                             <td className="py-3 text-right">{item.priceDisplay}</td>
                             <td className="py-3 text-right font-medium">
-                              {item.totalDisplay} {invoice.mint}
+                              {item.totalDisplay} {mint?.displayName ?? invoice.mint}
                             </td>
                           </tr>
                         ))}
@@ -174,7 +227,7 @@ export function InvoiceDetailClient({
                         Settlement details
                       </p>
                       <p>Network: Solana</p>
-                      <p>Asset: {invoice.mint}</p>
+                      <p>Asset: {mint?.displayName ?? invoice.mint}</p>
                       <p>
                         Privacy:{" "}
                         {invoice.privacyRail === "umbra"
@@ -255,21 +308,59 @@ export function InvoiceDetailClient({
                     </div>
                     <div>
                       <h3 className="font-medium text-[var(--status-pending)]">
-                        Payment Detection Mocked
+                        {isUmbraPaymentConfirmed
+                          ? "Umbra Payment Confirmed"
+                          : isUmbraPaymentSubmitted
+                            ? "Umbra Payment Submitted"
+                          : "Awaiting Umbra Payment"}
                       </h3>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Umbra payment detection and merchant claiming stay mocked
-                        until the settlement slice.
+                        {isUmbraPaymentConfirmed
+                          ? "The merchant wallet confirmed this claimable UTXO. You can continue to settlement."
+                          : isUmbraPaymentSubmitted
+                            ? "A customer payment transaction was submitted. Confirm the merchant wallet can claim the matching UTXO before detection."
+                          : "Customer payment detection now records confirmed Umbra checkout signatures. Merchant claiming stays in the settlement slice."}
                       </p>
-                      <Button
-                        asChild
-                        size="sm"
-                        className="mt-4 w-full bg-[var(--status-pending)] text-white hover:bg-[var(--status-pending)]/90"
-                      >
-                        <Link href={`/invoices/${invoice.id}/settlement`}>
-                          Review & Claim
-                        </Link>
-                      </Button>
+                      {latestUmbraPayment && (
+                        <p className="mt-3 font-mono text-xs text-muted-foreground">
+                          {truncateSignature(
+                            latestUmbraPayment.createUtxoSignature,
+                          )}
+                        </p>
+                      )}
+                      {confirmationError && (
+                        <p className="mt-3 text-xs leading-relaxed text-red-700">
+                          {confirmationError}
+                        </p>
+                      )}
+                      {isUmbraPaymentSubmitted ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={
+                            !standardWallets.ready || confirmUmbraPayment.isPending
+                          }
+                          className="mt-4 w-full bg-[var(--status-pending)] text-white hover:bg-[var(--status-pending)]/90"
+                          onClick={() => void handleConfirmUmbraPayment()}
+                        >
+                          {confirmUmbraPayment.isPending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <ShieldCheck className="size-4" />
+                          )}
+                          Confirm Claimable Payment
+                        </Button>
+                      ) : (
+                        <Button
+                          asChild
+                          size="sm"
+                          className="mt-4 w-full bg-[var(--status-pending)] text-white hover:bg-[var(--status-pending)]/90"
+                        >
+                          <Link href={`/invoices/${invoice.id}/settlement`}>
+                            Review & Claim
+                          </Link>
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>

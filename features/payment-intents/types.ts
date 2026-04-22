@@ -9,9 +9,10 @@ export type SupportedMint = (typeof SUPPORTED_MINTS)[number];
 export type SerializedPaymentIntent = {
   id: string;
   merchantProfileId: string;
+  merchantName: string;
   merchantWallet: string;
   amountAtomic: string;
-  mint: string;
+  mint: SupportedMint;
   status: PaymentIntentStatus;
   note: string;
   customerLabel: string | null;

@@ -1,22 +1,31 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { PrivyProvider } from "@privy-io/react-auth";
 import { toSolanaWalletConnectors } from "@privy-io/react-auth/solana";
 
 import { SOLANA_WALLET_LIST } from "@/features/auth/privy-wallets";
 
 type AppPrivyProviderProps = {
-  children: React.ReactNode;
+  children: ReactNode;
+  missingAppIdFallback?: ReactNode;
 };
 
 const solanaConnectors = toSolanaWalletConnectors({
   shouldAutoConnect: false,
 });
 
-export function AppPrivyProvider({ children }: AppPrivyProviderProps) {
+export function AppPrivyProvider({
+  children,
+  missingAppIdFallback,
+}: AppPrivyProviderProps) {
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
 
   if (!appId) {
+    if (missingAppIdFallback) {
+      return missingAppIdFallback;
+    }
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-6 py-12">
         <div className="w-full max-w-md rounded-lg border border-card-border bg-card p-6 text-center shadow-sm">

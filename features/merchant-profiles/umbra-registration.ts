@@ -56,7 +56,7 @@ function describeUmbraFailure(action: string, error: unknown) {
   const stage = getUmbraErrorStage(error);
 
   if (message === "Failed to fetch" || message === "fetch failed") {
-    return `${action} failed because an Umbra devnet network request could not be reached. Restart the dev server and retry; if it persists, check the devnet RPC and Umbra ZK asset proxy.`;
+    return `${action} failed because an Umbra network request could not be reached. Restart the dev server and retry; if it persists, check the configured RPC and Umbra ZK asset proxy.`;
   }
 
   return `${action} failed${stage ? ` during ${stage}` : ""}: ${message}`;

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { SerializedPaymentIntent } from "@/features/payment-intents/types";
+import { getPaymentMintConfig } from "@/features/payments/mints";
 import { formatAtomicAmount, formatDateTime } from "@/lib/format";
 
 type IntentListProps = {
@@ -24,44 +25,51 @@ export function IntentList({
 
   return (
     <div className="intent-list">
-      {intents.map((intent) => (
-        <article className="card intent-card" key={intent.id}>
-          <div className="intent-header">
-            <div>
-              <p className="eyebrow">{intent.mint}</p>
-              <h2>{formatAtomicAmount(intent.amountAtomic)} {intent.mint}</h2>
-            </div>
-            <span className={`status-pill status-${intent.status}`}>
-              {intent.status}
-            </span>
-          </div>
+      {intents.map((intent) => {
+        const mint = getPaymentMintConfig(intent.mint);
 
-          <dl className="intent-meta">
-            <div>
-              <dt>Note</dt>
-              <dd>{intent.note || "No note"}</dd>
+        return (
+          <article className="card intent-card" key={intent.id}>
+            <div className="intent-header">
+              <div>
+                <p className="eyebrow">{mint.displayName}</p>
+                <h2>
+                  {formatAtomicAmount(intent.amountAtomic, mint.decimals)}{" "}
+                  {mint.displayName}
+                </h2>
+              </div>
+              <span className={`status-pill status-${intent.status}`}>
+                {intent.status}
+              </span>
             </div>
-            <div>
-              <dt>Customer</dt>
-              <dd>{intent.customerLabel || "Not set"}</dd>
-            </div>
-            <div>
-              <dt>Created</dt>
-              <dd>{formatDateTime(intent.createdAt)}</dd>
-            </div>
-            <div>
-              <dt>Expires</dt>
-              <dd>{formatDateTime(intent.expiresAt)}</dd>
-            </div>
-          </dl>
 
-          <div className="intent-links">
-            <Link href={`/pay/${intent.id}`} className="text-link">
-              Open checkout
-            </Link>
-          </div>
-        </article>
-      ))}
+            <dl className="intent-meta">
+              <div>
+                <dt>Note</dt>
+                <dd>{intent.note || "No note"}</dd>
+              </div>
+              <div>
+                <dt>Customer</dt>
+                <dd>{intent.customerLabel || "Not set"}</dd>
+              </div>
+              <div>
+                <dt>Created</dt>
+                <dd>{formatDateTime(intent.createdAt)}</dd>
+              </div>
+              <div>
+                <dt>Expires</dt>
+                <dd>{formatDateTime(intent.expiresAt)}</dd>
+              </div>
+            </dl>
+
+            <div className="intent-links">
+              <Link href={`/pay/${intent.id}`} className="text-link">
+                Open checkout
+              </Link>
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 }

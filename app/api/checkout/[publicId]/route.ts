@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { serializePublicUmbraPaymentStatus } from "@/features/invoices/mappers";
 import { getInvoiceByPublicId } from "@/features/invoices/service";
 
 type CheckoutStatusRouteProps = {
@@ -24,6 +25,10 @@ export async function GET(
       publicId: invoice.publicId,
       invoiceNumber: invoice.invoiceNumber,
       status: invoice.status,
+      privacyRail: invoice.privacyRail,
+      latestUmbraPayment: serializePublicUmbraPaymentStatus(
+        invoice.latestUmbraPayment,
+      ),
     },
   });
 }

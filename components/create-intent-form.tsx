@@ -1,15 +1,23 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { useCreatePaymentIntentMutation } from "@/features/payment-intents/queries";
+import { getConfiguredPaymentMint } from "@/features/payments/mints";
+import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 
 export function CreateIntentForm() {
   const router = useRouter();
   const createPaymentIntent = useCreatePaymentIntentMutation();
   const { profile } = useMerchantProfile();
-  const [amountAtomic, setAmountAtomic] = useState("1000000");
+  const configuredMint = useMemo(
+    () => getConfiguredPaymentMint(getUmbraRuntimeConfig().network),
+    [],
+  );
+  const [amountAtomic, setAmountAtomic] = useState(() =>
+    (10n ** BigInt(configuredMint.decimals)).toString(),
+  );
   const [note, setNote] = useState("");
   const [customerLabel, setCustomerLabel] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
@@ -23,7 +31,7 @@ export function CreateIntentForm() {
     try {
       const intent = await createPaymentIntent.mutateAsync({
         amountAtomic,
-        mint: "USDC",
+        mint: configuredMint.id,
         note,
         customerLabel,
         expiresAt: expiresAt || null,
@@ -65,7 +73,7 @@ export function CreateIntentForm() {
 
       <label className="field">
         <span>Mint</span>
-        <input value="USDC" disabled readOnly />
+        <input value={configuredMint.displayName} disabled readOnly />
       </label>
 
       <label className="field">

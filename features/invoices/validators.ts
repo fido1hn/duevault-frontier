@@ -12,9 +12,10 @@ import type {
   PaymentRail,
   PrivacyRail,
 } from "@/features/invoices/types";
-
-const ATOMIC_DECIMALS = 6n;
-const ATOMIC_FACTOR = 10n ** ATOMIC_DECIMALS;
+import {
+  getPaymentMintDecimals,
+  getPaymentMintDisplayName,
+} from "@/features/payments/mints";
 
 export function assertInvoiceStatus(value: string): asserts value is InvoiceStatus {
   if (!INVOICE_STATUSES.includes(value as InvoiceStatus)) {
@@ -81,17 +82,28 @@ export function parseDate(value: string, label: string) {
   return date;
 }
 
-export function parseUsdcToAtomic(value: number | string) {
-  const normalized = String(value).trim();
+function getAtomicFactor(mint: InvoiceMint) {
+  return 10n ** BigInt(getPaymentMintDecimals(mint));
+}
 
-  if (!/^\d+(\.\d{1,6})?$/.test(normalized)) {
-    throw new Error("Line item price must be a positive USDC amount.");
+export function parsePaymentAmountToAtomic(
+  value: number | string,
+  mint: InvoiceMint,
+) {
+  const normalized = String(value).trim();
+  const decimals = getPaymentMintDecimals(mint);
+  const displayName = getPaymentMintDisplayName(mint);
+
+  if (!new RegExp(`^\\d+(\\.\\d{1,${decimals}})?$`).test(normalized)) {
+    throw new Error(
+      `Line item price must be a positive ${displayName} amount with no more than ${decimals} decimal places.`,
+    );
   }
 
   const [whole, fraction = ""] = normalized.split(".");
   const atomic =
-    BigInt(whole) * ATOMIC_FACTOR +
-    BigInt(fraction.padEnd(Number(ATOMIC_DECIMALS), "0"));
+    BigInt(whole) * getAtomicFactor(mint) +
+    BigInt(fraction.padEnd(decimals, "0"));
 
   if (atomic <= 0n) {
     throw new Error("Line item price must be greater than zero.");
@@ -100,12 +112,17 @@ export function parseUsdcToAtomic(value: number | string) {
   return atomic.toString();
 }
 
-export function atomicToNumber(value: string) {
-  return Number(value) / Number(ATOMIC_FACTOR);
+export function parseUsdcToAtomic(value: number | string) {
+  return parsePaymentAmountToAtomic(value, "USDC");
+}
+
+export function atomicToNumber(value: string, mint: InvoiceMint = "USDC") {
+  return Number(value) / Number(getAtomicFactor(mint));
 }
 
 export function buildLineItems(
   input: CreateInvoiceInput["lineItems"],
+  mint: InvoiceMint,
 ): InvoiceLineItemCreateData[] {
   if (!Array.isArray(input) || input.length === 0) {
     throw new Error("At least one line item is required.");
@@ -125,7 +142,7 @@ export function buildLineItems(
     return {
       description,
       quantity,
-      unitAmountAtomic: parseUsdcToAtomic(item.price),
+      unitAmountAtomic: parsePaymentAmountToAtomic(item.price, mint),
       sortOrder: index,
     };
   });

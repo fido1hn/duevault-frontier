@@ -4,6 +4,7 @@ import { serializePaymentIntent } from "@/features/payment-intents/mappers";
 import {
   createPaymentIntentRecord,
   findPaymentIntentById,
+  findPublicPaymentIntentById,
   listPaymentIntentRecords,
   updatePaymentIntentRecord,
 } from "@/features/payment-intents/repository";
@@ -12,8 +13,14 @@ import type {
   PaymentIntentStatus,
   UpdatePaymentIntentInput,
 } from "@/features/payment-intents/types";
+import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
+import {
+  getConfiguredPaymentMint,
+  resolvePaymentMintForNetwork,
+} from "@/features/payments/mints";
 import {
   assertPaymentIntentStatus,
+  assertSupportedMint,
   parseOptionalDate,
   sanitizeAmountAtomic,
 } from "@/features/payment-intents/validators";
@@ -36,14 +43,34 @@ export async function getPaymentIntentById(
   return intent ? serializePaymentIntent(intent) : null;
 }
 
+export async function getPublicActivePaymentIntentById(intentId: string) {
+  const intent = await findPublicPaymentIntentById(intentId);
+
+  if (!intent || intent.status !== "active") {
+    return null;
+  }
+
+  if (intent.expiresAt && intent.expiresAt <= new Date()) {
+    return null;
+  }
+
+  return serializePaymentIntent(intent);
+}
+
 export async function createPaymentIntent(
   merchantProfileId: string,
   input: CreatePaymentIntentInput,
 ) {
+  const runtimeConfig = getUmbraRuntimeConfig();
+  const mint = input.mint ?? getConfiguredPaymentMint(runtimeConfig.network).id;
+
+  assertSupportedMint(mint);
+  resolvePaymentMintForNetwork(mint, runtimeConfig.network);
+
   const intent = await createPaymentIntentRecord({
     merchantProfileId,
     amountAtomic: sanitizeAmountAtomic(input.amountAtomic),
-    mint: input.mint ?? "USDC",
+    mint,
     status: "active",
     note: input.note?.trim() ?? "",
     customerLabel: input.customerLabel?.trim() || null,

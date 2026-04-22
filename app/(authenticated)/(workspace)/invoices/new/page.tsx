@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -26,17 +26,19 @@ import type {
   PaymentRail,
   PrivacyRail,
 } from "@/features/invoices/types";
+import { getConfiguredPaymentMint } from "@/features/payments/mints";
+import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 
 type EditableLineItem = {
   id: number;
   description: string;
   quantity: number;
-  price: number;
+  price: string;
 };
 
-function formatUsdc(value: number) {
+function formatPaymentAmount(value: number, decimals: number) {
   return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 2,
+    maximumFractionDigits: decimals,
   }).format(value);
 }
 
@@ -46,6 +48,10 @@ export default function NewInvoicePage() {
 
 function NewInvoiceContent() {
   const { profile } = useMerchantProfile();
+  const configuredMint = useMemo(
+    () => getConfiguredPaymentMint(getUmbraRuntimeConfig().network),
+    [],
+  );
   const router = useRouter();
   const createInvoice = useCreateInvoiceMutation();
   const [clientName, setClientName] = useState("Atlas Labs");
@@ -57,16 +63,20 @@ function NewInvoiceContent() {
   const [paymentRail, setPaymentRail] = useState<PaymentRail>(profile.paymentRail);
   const [privacyRail, setPrivacyRail] = useState<PrivacyRail>(profile.privacyRail);
   const [lineItems, setLineItems] = useState<EditableLineItem[]>([
-    { id: 1, description: "Product strategy sprint", quantity: 1, price: 1600 },
-    { id: 2, description: "Umbra integration advisory", quantity: 1, price: 650 },
+    { id: 1, description: "Product strategy sprint", quantity: 1, price: "1600" },
+    { id: 2, description: "Umbra integration advisory", quantity: 1, price: "650" },
   ]);
   const [submitError, setSubmitError] = useState("");
   const isSubmitting = createInvoice.isPending;
 
   const total = lineItems.reduce(
-    (sum, item) => sum + item.quantity * item.price,
+    (sum, item) => sum + item.quantity * Number(item.price || 0),
     0,
   );
+  const priceStep =
+    configuredMint.decimals > 0
+      ? `0.${"0".repeat(configuredMint.decimals - 1)}1`
+      : "1";
 
   function updateLineItem(id: number, patch: Partial<EditableLineItem>) {
     setLineItems((items) =>
@@ -77,7 +87,7 @@ function NewInvoiceContent() {
   function addLineItem() {
     setLineItems((items) => [
       ...items,
-      { id: Date.now(), description: "", quantity: 1, price: 0 },
+      { id: Date.now(), description: "", quantity: 1, price: "0" },
     ]);
   }
 
@@ -97,7 +107,7 @@ function NewInvoiceContent() {
       notes,
       paymentRail,
       privacyRail,
-      mint: "USDC",
+      mint: configuredMint.id,
       status,
       lineItems: lineItems.map((item) => ({
         description: item.description,
@@ -220,11 +230,11 @@ function NewInvoiceContent() {
                       <Input
                         type="number"
                         min={0}
-                        step="0.01"
+                        step={priceStep}
                         value={item.price}
                         onChange={(event) =>
                           updateLineItem(item.id, {
-                            price: Number(event.target.value),
+                            price: event.target.value,
                           })
                         }
                         className="w-32 bg-background"
@@ -265,7 +275,9 @@ function NewInvoiceContent() {
                       <SelectValue placeholder="Select network" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="solana">Solana USDC</SelectItem>
+                      <SelectItem value="solana">
+                        Solana {configuredMint.displayName}
+                      </SelectItem>
                       <SelectItem value="ethereum" disabled>
                         Ethereum USDC (Coming Soon)
                       </SelectItem>
@@ -393,9 +405,18 @@ function NewInvoiceContent() {
                             {item.description || "Item description"}
                           </td>
                           <td className="py-3 text-right">{item.quantity}</td>
-                          <td className="py-3 text-right">{formatUsdc(item.price)}</td>
+                          <td className="py-3 text-right">
+                            {formatPaymentAmount(
+                              Number(item.price || 0),
+                              configuredMint.decimals,
+                            )}
+                          </td>
                           <td className="py-3 text-right font-medium">
-                            {formatUsdc(item.quantity * item.price)} USDC
+                            {formatPaymentAmount(
+                              item.quantity * Number(item.price || 0),
+                              configuredMint.decimals,
+                            )}{" "}
+                            {configuredMint.displayName}
                           </td>
                         </tr>
                       ))}
@@ -407,12 +428,18 @@ function NewInvoiceContent() {
                   <div className="flex w-1/2 flex-col gap-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Subtotal</span>
-                      <span>{formatUsdc(total)} USDC</span>
+                      <span>
+                        {formatPaymentAmount(total, configuredMint.decimals)}{" "}
+                        {configuredMint.displayName}
+                      </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between font-serif text-base font-medium">
                       <span>Total Due</span>
-                      <span>{formatUsdc(total)} USDC</span>
+                      <span>
+                        {formatPaymentAmount(total, configuredMint.decimals)}{" "}
+                        {configuredMint.displayName}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -423,8 +450,9 @@ function NewInvoiceContent() {
                       Payment Instructions
                     </p>
                     <p className="text-sm">
-                      Pay via Solana USDC. This invoice uses Umbra Protocol for
-                      private settlement through a stealth address.
+                      Pay via Solana {configuredMint.displayName}. This invoice
+                      uses Umbra Protocol for private settlement through a
+                      stealth address.
                     </p>
                   </div>
                   <div>

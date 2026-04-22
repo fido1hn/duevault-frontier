@@ -1,3 +1,5 @@
+import { PAYMENT_MINT_IDS } from "@/features/payments/mints";
+
 export const PAYMENT_INTENT_STATUSES = [
   "draft",
   "active",
@@ -6,4 +8,4 @@ export const PAYMENT_INTENT_STATUSES = [
   "expired",
 ] as const;
 
-export const SUPPORTED_MINTS = ["USDC"] as const;
+export const SUPPORTED_MINTS = PAYMENT_MINT_IDS;

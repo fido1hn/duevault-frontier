@@ -29,6 +29,10 @@ What comes next:
 - live private payment creation and claiming
 - live private balance query and withdrawals
 
+## Design docs
+
+- [Umbra SDK product flows](docs/umbra-sdk-product-flows.md)
+
 ## Local development
 
 Install dependencies:
@@ -76,7 +80,7 @@ The default local setup uses:
 - Supabase Postgres for off-chain records
 - Prisma migrations as the source of truth for app tables
 - Privy for merchant authentication and external Solana wallet linking
-- checkout recipient and USDC mint envs for Solana Pay QR previews
+- network-aware checkout mint config for Solana Pay and Umbra checkout
 
 Required auth envs:
 
@@ -88,6 +92,19 @@ Required database envs:
 
 - `DATABASE_URL` for runtime Prisma queries
 - `DIRECT_URL` for Prisma migrations against Supabase Postgres
+
+Required production rate-limit envs:
+
+- `KV_REST_API_URL`
+- `KV_REST_API_TOKEN`
+- These protect the public Umbra payment submission endpoint before it performs Solana RPC verification. Provision Redis through the Vercel Marketplace/Upstash; the app uses `@vercel/kv` because it exposes the expected Upstash-compatible REST client.
+
+Checkout mint envs:
+
+- Local/devnet demo: `NEXT_PUBLIC_UMBRA_NETWORK=devnet` and `NEXT_PUBLIC_CHECKOUT_MINT_ID=UMBRA_DEVNET`
+- Production/mainnet: `NEXT_PUBLIC_UMBRA_NETWORK=mainnet` and `NEXT_PUBLIC_CHECKOUT_MINT_ID=USDC`
+- Production must also set `NEXT_PUBLIC_UMBRA_RPC_URL` and `NEXT_PUBLIC_UMBRA_RPC_SUBSCRIPTIONS_URL`; missing Umbra envs fail closed instead of defaulting to devnet.
+- `NEXT_PUBLIC_CHECKOUT_USDC_MINT` is deprecated; checkout mints are resolved from the supported catalog in `features/payments/mints.ts`.
 
 ## Project structure
 

@@ -14,12 +14,19 @@ import {
   getUmbraRelayer,
   getUserAccountQuerierFunction,
   getUserRegistrationFunction,
+  assertOptionalData32,
 } from "@umbra-privacy/sdk";
 import type {
   IUmbraSigner,
+  TransactionCallbacks,
   UserRegistrationOptions,
 } from "@umbra-privacy/sdk/interfaces";
-import type { RcEncryptionNonce, U32, U64 } from "@umbra-privacy/sdk/types";
+import type {
+  OptionalData32,
+  RcEncryptionNonce,
+  U32,
+  U64,
+} from "@umbra-privacy/sdk/types";
 import type { QueryUserAccountResult } from "@umbra-privacy/sdk/types";
 import { generateRandomNonce } from "@umbra-privacy/sdk/utils";
 import {
@@ -38,6 +45,9 @@ export type DueVaultConfig = {
   rpcUrl: string;
   rpcSubscriptionsUrl: string;
   signer: IUmbraSigner;
+  masterSeedStorage?: NonNullable<
+    Parameters<typeof getUmbraClient>[1]
+  >["masterSeedStorage"];
   deferMasterSeedSignature?: boolean;
   preferPollingTransactionForwarder?: boolean;
   indexerApiEndpoint?: string;
@@ -48,6 +58,10 @@ type PrivatePaymentRequest = {
   destinationAddress: string;
   mint: string;
   amount: bigint;
+  optionalData?: Uint8Array;
+  callbacks?: {
+    createUtxo?: TransactionCallbacks;
+  };
 };
 
 type ComplianceGrantRequest = {
@@ -82,6 +96,21 @@ export const UMBRA_MAINNET_MINTS = {
 } as const;
 
 export async function createDueVaultClient(config: DueVaultConfig) {
+  const deps = {
+    ...(config.preferPollingTransactionForwarder
+      ? {
+          transactionForwarder: getPollingTransactionForwarder({
+            rpcUrl: config.rpcUrl,
+          }),
+        }
+      : {}),
+    ...(config.masterSeedStorage
+      ? {
+          masterSeedStorage: config.masterSeedStorage,
+        }
+      : {}),
+  };
+
   return getUmbraClient(
     {
       signer: config.signer,
@@ -91,13 +120,7 @@ export async function createDueVaultClient(config: DueVaultConfig) {
       deferMasterSeedSignature: config.deferMasterSeedSignature,
       indexerApiEndpoint: config.indexerApiEndpoint ?? DEFAULT_INDEXER_ENDPOINT,
     },
-    config.preferPollingTransactionForwarder
-      ? {
-          transactionForwarder: getPollingTransactionForwarder({
-            rpcUrl: config.rpcUrl,
-          }),
-        }
-      : undefined,
+    Object.keys(deps).length > 0 ? deps : undefined,
   );
 }
 
@@ -173,17 +196,37 @@ export async function createPrivatePayment(
   request: PrivatePaymentRequest,
 ) {
   const client = await createDueVaultClient(config);
-  const zkProver = getCreateReceiverClaimableUtxoFromPublicBalanceProver();
+  const zkProver = getCreateReceiverClaimableUtxoFromPublicBalanceProver(
+    typeof window === "undefined"
+      ? undefined
+      : {
+          assetProvider: getProxiedUmbraZkAssetProvider(),
+        },
+  );
   const createUtxo = getPublicBalanceToReceiverClaimableUtxoCreatorFunction(
     { client },
-    { zkProver },
+    {
+      zkProver,
+      hooks: {
+        createUtxo: request.callbacks?.createUtxo,
+      },
+    },
   );
+  let optionalData: OptionalData32 | undefined;
 
-  return createUtxo({
-    destinationAddress: toAddress(request.destinationAddress),
-    mint: toAddress(request.mint),
-    amount: toU64(request.amount),
-  });
+  if (request.optionalData) {
+    assertOptionalData32(request.optionalData, "payment optional data");
+    optionalData = request.optionalData;
+  }
+
+  return createUtxo(
+    {
+      destinationAddress: toAddress(request.destinationAddress),
+      mint: toAddress(request.mint),
+      amount: toU64(request.amount),
+    },
+    optionalData ? { optionalData } : undefined,
+  );
 }
 
 export async function claimIncomingPayments(config: DueVaultConfig) {

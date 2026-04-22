@@ -53,30 +53,31 @@ model Wallet {
 }
 
 model MerchantProfile {
-  id                          String          @id @default(cuid())
-  userId                      String          @unique
-  user                        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                          String                @id @default(cuid())
+  userId                      String                @unique
+  user                        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   primaryWalletId             String
-  primaryWallet               Wallet          @relation("PrimaryMerchantWallet", fields: [primaryWalletId], references: [id])
+  primaryWallet               Wallet                @relation("PrimaryMerchantWallet", fields: [primaryWalletId], references: [id])
   businessName                String
   contactEmail                String
   businessAddress             String
-  defaultNotes                String          @default("Thank you for your business. Payment is expected within 30 days.")
-  defaultMint                 String          @default("USDC")
-  paymentRail                 String          @default("solana")
-  privacyRail                 String          @default("umbra")
-  umbraNetwork                String          @default("devnet")
-  umbraStatus                 String          @default("not_setup")
+  defaultNotes                String                @default("Thank you for your business. Payment is expected within 30 days.")
+  defaultMint                 String                @default("USDC")
+  paymentRail                 String                @default("solana")
+  privacyRail                 String                @default("umbra")
+  umbraNetwork                String                @default("devnet")
+  umbraStatus                 String                @default("not_setup")
   umbraRegisteredAt           DateTime?
   umbraWalletAddress          String?
-  umbraRegistrationSignatures String[]        @default([])
+  umbraRegistrationSignatures String[]              @default([])
   umbraLastCheckedAt          DateTime?
   onboardingCompletedAt       DateTime?
-  createdAt                   DateTime        @default(now())
-  updatedAt                   DateTime        @updatedAt
+  createdAt                   DateTime              @default(now())
+  updatedAt                   DateTime              @updatedAt
   customers                   Customer[]
   invoices                    Invoice[]
   paymentIntents              PaymentIntent[]
+  umbraInvoicePayments        UmbraInvoicePayment[]
 
   @@index([contactEmail])
   @@index([primaryWalletId])
@@ -115,26 +116,27 @@ model Customer {
 }
 
 model Invoice {
-  id                String            @id @default(cuid())
-  publicId          String            @unique @default(uuid())
+  id                String                @id @default(cuid())
+  publicId          String                @unique @default(uuid())
   merchantProfileId String
-  merchantProfile   MerchantProfile   @relation(fields: [merchantProfileId], references: [id], onDelete: Cascade)
+  merchantProfile   MerchantProfile       @relation(fields: [merchantProfileId], references: [id], onDelete: Cascade)
   invoiceNumber     String
   customerId        String
-  customer          Customer          @relation(fields: [customerId], references: [id])
+  customer          Customer              @relation(fields: [customerId], references: [id])
   customerName      String
   customerEmail     String
-  status            String            @default("Draft")
+  status            String                @default("Draft")
   issuedAt          DateTime
   dueAt             DateTime
-  notes             String            @default("")
-  paymentRail       String            @default("solana")
-  privacyRail       String            @default("umbra")
-  mint              String            @default("USDC")
+  notes             String                @default("")
+  paymentRail       String                @default("solana")
+  privacyRail       String                @default("umbra")
+  mint              String                @default("USDC")
   totalAmountAtomic String
   lineItems         InvoiceLineItem[]
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  umbraPayments     UmbraInvoicePayment[]
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
   @@unique([merchantProfileId, invoiceNumber])
   @@index([merchantProfileId])
@@ -157,4 +159,31 @@ model InvoiceLineItem {
   updatedAt        DateTime @updatedAt
 
   @@index([invoiceId])
+}
+
+model UmbraInvoicePayment {
+  id                          String          @id @default(cuid())
+  invoiceId                   String
+  invoice                     Invoice         @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  merchantProfileId           String
+  merchantProfile             MerchantProfile @relation(fields: [merchantProfileId], references: [id], onDelete: Cascade)
+  payerWalletAddress          String
+  merchantUmbraWalletAddress  String
+  network                     String
+  mint                        String
+  amountAtomic                String
+  status                      String          @default("submitted")
+  optionalData                String
+  closeProofAccountSignature  String?
+  createProofAccountSignature String
+  createUtxoSignature         String          @unique
+  error                       String?
+  confirmedAt                 DateTime?
+  createdAt                   DateTime        @default(now())
+  updatedAt                   DateTime        @updatedAt
+
+  @@index([invoiceId])
+  @@index([merchantProfileId])
+  @@index([invoiceId, status])
+  @@index([payerWalletAddress])
 }

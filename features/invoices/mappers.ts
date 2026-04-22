@@ -1,5 +1,9 @@
 import type { InvoiceRecord } from "@/features/invoices/repository";
-import type { SerializedInvoice } from "@/features/invoices/types";
+import type {
+  PublicUmbraPaymentStatus,
+  SerializedInvoice,
+  SerializedUmbraInvoicePayment,
+} from "@/features/invoices/types";
 import {
   assertInvoiceMint,
   assertInvoiceStatus,
@@ -7,6 +11,14 @@ import {
   assertPrivacyRail,
   atomicToNumber,
 } from "@/features/invoices/validators";
+import {
+  assertUmbraNetwork,
+  assertUmbraRegistrationStatus,
+} from "@/features/merchant-profiles/validators";
+import {
+  getPaymentMintDecimals,
+  getPaymentMintDisplayName,
+} from "@/features/payments/mints";
 
 const shortDateFormatter = new Intl.DateTimeFormat("en-US", {
   month: "short",
@@ -30,13 +42,89 @@ export function formatUsdcValue(value: number) {
   return amountFormatter.format(value);
 }
 
+export function formatPaymentMintValue(
+  value: number,
+  mint: SerializedInvoice["mint"],
+) {
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: getPaymentMintDecimals(mint),
+  }).format(value);
+}
+
+function assertUmbraInvoicePaymentStatus(
+  value: string,
+): asserts value is SerializedUmbraInvoicePayment["status"] {
+  if (value !== "confirmed" && value !== "failed" && value !== "submitted") {
+    throw new Error("Invalid Umbra invoice payment status.");
+  }
+}
+
+export function serializeUmbraInvoicePayment(
+  payment: InvoiceRecord["umbraPayments"][number],
+): SerializedUmbraInvoicePayment {
+  assertUmbraNetwork(payment.network);
+  assertUmbraInvoicePaymentStatus(payment.status);
+
+  return {
+    id: payment.id,
+    invoiceId: payment.invoiceId,
+    merchantProfileId: payment.merchantProfileId,
+    payerWalletAddress: payment.payerWalletAddress,
+    merchantUmbraWalletAddress: payment.merchantUmbraWalletAddress,
+    network: payment.network,
+    mint: payment.mint,
+    amountAtomic: payment.amountAtomic,
+    status: payment.status,
+    optionalData: payment.optionalData,
+    closeProofAccountSignature: payment.closeProofAccountSignature,
+    createProofAccountSignature: payment.createProofAccountSignature,
+    createUtxoSignature: payment.createUtxoSignature,
+    error: payment.error,
+    confirmedAt: payment.confirmedAt?.toISOString() ?? null,
+    createdAt: payment.createdAt.toISOString(),
+    updatedAt: payment.updatedAt.toISOString(),
+  };
+}
+
+function previewSignature(signature: string) {
+  return `${signature.slice(0, 8)}...${signature.slice(-8)}`;
+}
+
+export function serializePublicUmbraPaymentStatus(
+  payment:
+    | InvoiceRecord["umbraPayments"][number]
+    | SerializedUmbraInvoicePayment
+    | null
+    | undefined,
+): PublicUmbraPaymentStatus | null {
+  if (!payment) {
+    return null;
+  }
+
+  assertUmbraInvoicePaymentStatus(payment.status);
+
+  const confirmedAt =
+    payment.confirmedAt instanceof Date
+      ? payment.confirmedAt.toISOString()
+      : payment.confirmedAt;
+
+  return {
+    status: payment.status,
+    confirmedAt,
+    createUtxoSignaturePreview: previewSignature(payment.createUtxoSignature),
+  };
+}
+
 export function serializeInvoice(invoice: InvoiceRecord): SerializedInvoice {
   assertInvoiceStatus(invoice.status);
   assertPaymentRail(invoice.paymentRail);
   assertPrivacyRail(invoice.privacyRail);
   assertInvoiceMint(invoice.mint);
+  assertUmbraNetwork(invoice.merchantProfile.umbraNetwork);
+  assertUmbraRegistrationStatus(invoice.merchantProfile.umbraStatus);
 
-  const amountNumber = atomicToNumber(invoice.totalAmountAtomic);
+  const mint = invoice.mint;
+  const amountNumber = atomicToNumber(invoice.totalAmountAtomic, mint);
 
   return {
     id: invoice.invoiceNumber,
@@ -45,6 +133,9 @@ export function serializeInvoice(invoice: InvoiceRecord): SerializedInvoice {
     merchantProfileId: invoice.merchantProfileId,
     merchantName: invoice.merchantProfile.businessName,
     merchantWalletAddress: invoice.merchantProfile.primaryWallet.address,
+    merchantUmbraNetwork: invoice.merchantProfile.umbraNetwork,
+    merchantUmbraStatus: invoice.merchantProfile.umbraStatus,
+    merchantUmbraWalletAddress: invoice.merchantProfile.umbraWalletAddress,
     invoiceNumber: invoice.invoiceNumber,
     client: invoice.customerName,
     clientEmail: invoice.customerEmail,
@@ -53,20 +144,23 @@ export function serializeInvoice(invoice: InvoiceRecord): SerializedInvoice {
     dueLong: longDateFormatter.format(invoice.dueAt),
     issuedAt: invoice.issuedAt.toISOString(),
     dueAt: invoice.dueAt.toISOString(),
-    amount: `${formatUsdcValue(amountNumber)} ${invoice.mint}`,
+    amount: `${formatPaymentMintValue(
+      amountNumber,
+      mint,
+    )} ${getPaymentMintDisplayName(mint)}`,
     amountNumber,
     amountAtomic: invoice.totalAmountAtomic,
     status: invoice.status,
     notes: invoice.notes,
     paymentRail: invoice.paymentRail,
     privacyRail: invoice.privacyRail,
-    mint: invoice.mint,
+    mint,
     lineItems: invoice.lineItems.map((item) => {
-      const price = atomicToNumber(item.unitAmountAtomic);
+      const price = atomicToNumber(item.unitAmountAtomic, mint);
       const totalAtomic = (
         BigInt(item.unitAmountAtomic) * BigInt(item.quantity)
       ).toString();
-      const total = atomicToNumber(totalAtomic);
+      const total = atomicToNumber(totalAtomic, mint);
 
       return {
         id: item.id,
@@ -74,13 +168,16 @@ export function serializeInvoice(invoice: InvoiceRecord): SerializedInvoice {
         quantity: item.quantity,
         price,
         priceAtomic: item.unitAmountAtomic,
-        priceDisplay: formatUsdcValue(price),
+        priceDisplay: formatPaymentMintValue(price, mint),
         total,
         totalAtomic,
-        totalDisplay: formatUsdcValue(total),
+        totalDisplay: formatPaymentMintValue(total, mint),
         sortOrder: item.sortOrder,
       };
     }),
+    latestUmbraPayment: invoice.umbraPayments[0]
+      ? serializeUmbraInvoicePayment(invoice.umbraPayments[0])
+      : null,
     createdAt: invoice.createdAt.toISOString(),
     updatedAt: invoice.updatedAt.toISOString(),
   };
