@@ -8,6 +8,10 @@ import {
   mapCheckoutPaymentStatus,
 } from "@/features/checkout/status";
 import { getPaymentMintConfig } from "@/features/payments/mints";
+import {
+  UMBRA_APP_CHECKOUT_MINT_ID,
+  UMBRA_APP_NETWORK,
+} from "@/lib/umbra/config";
 
 const DEMO_BUSINESS = {
   name: "North Pier Studio",
@@ -27,7 +31,7 @@ const DEMO_INVOICE = {
 
 export const DEMO_CHECKOUT_NOTICE =
   "This is a mainnet Umbra payment preview. No action is required.";
-export const DEMO_UMBRA_NETWORK = "mainnet";
+export const DEMO_UMBRA_NETWORK = UMBRA_APP_NETWORK;
 export const DEMO_MERCHANT_RECEIVER_ADDRESS =
   "H6C55scp2z5ndmPXw5qYL4dKwQPQeCWBGRGKSpiVdBxY";
 
@@ -49,7 +53,7 @@ function demoInvoiceLineItems(
 }
 
 export function buildDemoCheckoutViewModel(): CheckoutPaymentViewModel {
-  const mint = getPaymentMintConfig("USDC");
+  const mint = getPaymentMintConfig(UMBRA_APP_CHECKOUT_MINT_ID);
   const memo = `DueVault invoice ${DEMO_INVOICE.id}`;
   const label = DEMO_BUSINESS.name;
   const message = `Payment for invoice ${DEMO_INVOICE.id}`;

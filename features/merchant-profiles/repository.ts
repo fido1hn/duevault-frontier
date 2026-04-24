@@ -30,6 +30,7 @@ export type UpsertMerchantProfileRecordInput = {
   defaultMint: InvoiceMint;
   paymentRail: PaymentRail;
   privacyRail: PrivacyRail;
+  umbraNetwork: UmbraNetwork;
   onboardingCompletedAt: Date;
 };
 
@@ -96,6 +97,7 @@ export async function upsertMerchantProfileRecord(
       defaultMint: input.defaultMint,
       paymentRail: input.paymentRail,
       privacyRail: input.privacyRail,
+      umbraNetwork: input.umbraNetwork,
       onboardingCompletedAt: input.onboardingCompletedAt,
     },
     create: input,

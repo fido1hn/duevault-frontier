@@ -65,7 +65,7 @@ model MerchantProfile {
   defaultMint                 String                @default("USDC")
   paymentRail                 String                @default("solana")
   privacyRail                 String                @default("umbra")
-  umbraNetwork                String                @default("devnet")
+  umbraNetwork                String                @default("mainnet")
   umbraStatus                 String                @default("not_setup")
   umbraRegisteredAt           DateTime?
   umbraWalletAddress          String?

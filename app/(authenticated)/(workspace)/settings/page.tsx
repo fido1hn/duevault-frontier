@@ -26,7 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
+import { getUmbraRuntimeNetwork } from "@/lib/umbra/config";
 import { useSaveUmbraRegistrationMutation } from "@/features/merchant-profiles/queries";
 import {
   runMerchantUmbraRegistration,
@@ -42,7 +42,7 @@ function SettingsContent() {
   const { profile } = useMerchantProfile();
   const standardWallets = useStandardWallets();
   const saveUmbraRegistration = useSaveUmbraRegistrationMutation();
-  const runtimeConfig = useMemo(() => getUmbraRuntimeConfig(), []);
+  const runtimeNetwork = useMemo(() => getUmbraRuntimeNetwork(), []);
   const [registrationStep, setRegistrationStep] =
     useState<MerchantUmbraRegistrationStepId | null>(null);
   const [registrationError, setRegistrationError] = useState("");
@@ -209,7 +209,7 @@ function SettingsContent() {
                     Umbra Protocol Integration
                   </CardTitle>
                   <CardDescription>
-                    Register this merchant wallet for stealth-ready devnet settlement.
+                    Register this merchant wallet for stealth-ready mainnet settlement.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-6">
@@ -239,7 +239,7 @@ function SettingsContent() {
                       )}
                       {profile.umbraStatus === "ready"
                         ? "Recheck Umbra setup"
-                        : `Set up Umbra on ${runtimeConfig.network}`}
+                        : `Set up Umbra on ${runtimeNetwork}`}
                     </Button>
                   </div>
 
@@ -247,7 +247,7 @@ function SettingsContent() {
                     <div className="flex flex-col gap-2">
                       <Label>Umbra Network</Label>
                       <Input
-                        value={runtimeConfig.network}
+                        value={runtimeNetwork}
                         readOnly
                         className="bg-muted/20 font-mono text-xs text-muted-foreground"
                       />
@@ -377,7 +377,7 @@ function getUmbraStatusDescription(status: UmbraRegistrationStatus) {
   }
 
   if (status === "registering") {
-    return "Wallet signatures and devnet registration transactions are in progress.";
+    return "Wallet signatures and mainnet registration transactions are in progress.";
   }
 
   if (status === "error") {

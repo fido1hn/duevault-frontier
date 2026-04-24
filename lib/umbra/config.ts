@@ -1,3 +1,7 @@
+import {
+  resolvePaymentMintForNetwork,
+  type ResolvedPaymentMintConfig,
+} from "@/features/payments/mints";
 import type { UmbraNetwork } from "@/features/merchant-profiles/types";
 
 export type UmbraRuntimeConfig = {
@@ -6,28 +10,42 @@ export type UmbraRuntimeConfig = {
   rpcSubscriptionsUrl: string;
 };
 
-const DEFAULT_UMBRA_NETWORK = "devnet";
-const DEFAULT_UMBRA_RPC_URL = "https://api.devnet.solana.com";
-const DEFAULT_UMBRA_RPC_SUBSCRIPTIONS_URL = "wss://api.devnet.solana.com";
+export type UmbraAppConfig = UmbraRuntimeConfig & {
+  checkoutMint: ResolvedPaymentMintConfig;
+};
+
+export const UMBRA_APP_NETWORK = "mainnet" as const;
+export const UMBRA_APP_CHECKOUT_MINT_ID = "USDC" as const;
+const DEFAULT_UMBRA_RPC_URL = "https://api.mainnet-beta.solana.com";
+const DEFAULT_UMBRA_RPC_SUBSCRIPTIONS_URL = "wss://api.mainnet-beta.solana.com";
 
 function isProductionRuntime() {
   return process.env.NODE_ENV === "production";
 }
 
-function normalizeNetwork(value: string | undefined): UmbraNetwork {
+function normalizeNetwork(value: string | undefined): UmbraNetwork | null {
   const normalized = value?.trim();
 
   if (normalized === "mainnet" || normalized === "devnet") {
     return normalized;
   }
 
-  if (isProductionRuntime()) {
-    throw new Error(
-      "NEXT_PUBLIC_UMBRA_NETWORK must be set to mainnet in production.",
-    );
+  return null;
+}
+
+function assertExpectedEnvValue(
+  name: "NEXT_PUBLIC_UMBRA_NETWORK" | "NEXT_PUBLIC_CHECKOUT_MINT_ID",
+  expected: string,
+) {
+  const value = process.env[name]?.trim();
+
+  if (!value) {
+    return;
   }
 
-  return DEFAULT_UMBRA_NETWORK;
+  if (value !== expected) {
+    throw new Error(`${name} must be ${expected} for this app.`);
+  }
 }
 
 function readUmbraUrlEnv(
@@ -47,12 +65,32 @@ function readUmbraUrlEnv(
   return fallback;
 }
 
-export function getUmbraRuntimeConfig(): UmbraRuntimeConfig {
+export function getUmbraRuntimeNetwork(): UmbraNetwork {
   const network = normalizeNetwork(process.env.NEXT_PUBLIC_UMBRA_NETWORK);
 
-  if (isProductionRuntime() && network !== "mainnet") {
-    throw new Error("Production Umbra checkout must run on mainnet.");
+  if (network && network !== UMBRA_APP_NETWORK) {
+    throw new Error("Umbra checkout must run on mainnet for this app.");
   }
+
+  assertExpectedEnvValue("NEXT_PUBLIC_UMBRA_NETWORK", UMBRA_APP_NETWORK);
+
+  return UMBRA_APP_NETWORK;
+}
+
+export function getUmbraCheckoutMint() {
+  assertExpectedEnvValue(
+    "NEXT_PUBLIC_CHECKOUT_MINT_ID",
+    UMBRA_APP_CHECKOUT_MINT_ID,
+  );
+
+  return resolvePaymentMintForNetwork(
+    UMBRA_APP_CHECKOUT_MINT_ID,
+    getUmbraRuntimeNetwork(),
+  );
+}
+
+export function getUmbraRuntimeConfig(): UmbraRuntimeConfig {
+  const network = getUmbraRuntimeNetwork();
 
   return {
     network,
@@ -64,5 +102,12 @@ export function getUmbraRuntimeConfig(): UmbraRuntimeConfig {
       "NEXT_PUBLIC_UMBRA_RPC_SUBSCRIPTIONS_URL",
       DEFAULT_UMBRA_RPC_SUBSCRIPTIONS_URL,
     ),
+  };
+}
+
+export function getUmbraAppConfig(): UmbraAppConfig {
+  return {
+    ...getUmbraRuntimeConfig(),
+    checkoutMint: getUmbraCheckoutMint(),
   };
 }

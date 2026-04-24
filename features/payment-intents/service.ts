@@ -13,11 +13,11 @@ import type {
   PaymentIntentStatus,
   UpdatePaymentIntentInput,
 } from "@/features/payment-intents/types";
-import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import {
-  getConfiguredPaymentMint,
-  resolvePaymentMintForNetwork,
-} from "@/features/payments/mints";
+  getUmbraCheckoutMint,
+  getUmbraRuntimeNetwork,
+} from "@/lib/umbra/config";
+import { resolvePaymentMintForNetwork } from "@/features/payments/mints";
 import {
   assertPaymentIntentStatus,
   assertSupportedMint,
@@ -61,11 +61,11 @@ export async function createPaymentIntent(
   merchantProfileId: string,
   input: CreatePaymentIntentInput,
 ) {
-  const runtimeConfig = getUmbraRuntimeConfig();
-  const mint = input.mint ?? getConfiguredPaymentMint(runtimeConfig.network).id;
+  const network = getUmbraRuntimeNetwork();
+  const mint = input.mint ?? getUmbraCheckoutMint().id;
 
   assertSupportedMint(mint);
-  resolvePaymentMintForNetwork(mint, runtimeConfig.network);
+  resolvePaymentMintForNetwork(mint, network);
 
   const intent = await createPaymentIntentRecord({
     merchantProfileId,

@@ -10,11 +10,13 @@ import {
 } from "@/features/invoices/repository";
 import { findMerchantProfileById } from "@/features/merchant-profiles/repository";
 import {
-  getConfiguredPaymentMint,
   resolvePaymentMintForNetwork,
 } from "@/features/payments/mints";
 import type { CreateInvoiceInput } from "@/features/invoices/types";
-import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
+import {
+  getUmbraCheckoutMint,
+  getUmbraRuntimeNetwork,
+} from "@/lib/umbra/config";
 import {
   assertInvoiceMint,
   assertInvoiceStatus,
@@ -70,8 +72,8 @@ export async function createInvoice(
   const status = input.status ?? "Sent";
   const paymentRail = input.paymentRail ?? "solana";
   const privacyRail = input.privacyRail ?? "umbra";
-  const runtimeConfig = getUmbraRuntimeConfig();
-  const mint = input.mint ?? getConfiguredPaymentMint(runtimeConfig.network).id;
+  const network = getUmbraRuntimeNetwork();
+  const mint = input.mint ?? getUmbraCheckoutMint().id;
 
   assertInvoiceStatus(status);
   assertPaymentRail(paymentRail);
@@ -97,9 +99,9 @@ export async function createInvoice(
       );
     }
 
-    if (merchantProfile.umbraNetwork !== runtimeConfig.network) {
+    if (merchantProfile.umbraNetwork !== network) {
       throw new Error(
-        `Merchant Umbra setup is for ${merchantProfile.umbraNetwork}, but checkout is configured for ${runtimeConfig.network}.`,
+        `Merchant Umbra setup is for ${merchantProfile.umbraNetwork}, but checkout is configured for ${network}.`,
       );
     }
 

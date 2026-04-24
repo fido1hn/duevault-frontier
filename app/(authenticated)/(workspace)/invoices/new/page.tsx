@@ -26,8 +26,7 @@ import type {
   PaymentRail,
   PrivacyRail,
 } from "@/features/invoices/types";
-import { getConfiguredPaymentMint } from "@/features/payments/mints";
-import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
+import { getUmbraCheckoutMint } from "@/lib/umbra/config";
 
 type EditableLineItem = {
   id: number;
@@ -59,10 +58,7 @@ export default function NewInvoicePage() {
 
 function NewInvoiceContent() {
   const { profile } = useMerchantProfile();
-  const configuredMint = useMemo(
-    () => getConfiguredPaymentMint(getUmbraRuntimeConfig().network),
-    [],
-  );
+  const configuredMint = useMemo(() => getUmbraCheckoutMint(), []);
   const router = useRouter();
   const createInvoice = useCreateInvoiceMutation();
   const [clientName, setClientName] = useState("");

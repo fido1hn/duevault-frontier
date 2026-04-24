@@ -101,9 +101,10 @@ Required production rate-limit envs:
 
 Checkout mint envs:
 
-- Local/devnet demo: `NEXT_PUBLIC_UMBRA_NETWORK=devnet` and `NEXT_PUBLIC_CHECKOUT_MINT_ID=UMBRA_DEVNET`
-- Production/mainnet: `NEXT_PUBLIC_UMBRA_NETWORK=mainnet` and `NEXT_PUBLIC_CHECKOUT_MINT_ID=USDC`
-- Production must also set `NEXT_PUBLIC_UMBRA_RPC_URL` and `NEXT_PUBLIC_UMBRA_RPC_SUBSCRIPTIONS_URL`; missing Umbra envs fail closed instead of defaulting to devnet.
+- The app now runs Umbra on mainnet only.
+- If set, `NEXT_PUBLIC_UMBRA_NETWORK` must be `mainnet`.
+- If set, `NEXT_PUBLIC_CHECKOUT_MINT_ID` must be `USDC`.
+- Production should set `NEXT_PUBLIC_UMBRA_RPC_URL` and `NEXT_PUBLIC_UMBRA_RPC_SUBSCRIPTIONS_URL` to the mainnet RPC endpoints you want Umbra to use.
 - `NEXT_PUBLIC_CHECKOUT_USDC_MINT` is deprecated; checkout mints are resolved from the supported catalog in `features/payments/mints.ts`.
 
 ## Project structure

@@ -10,11 +10,8 @@ import type {
   UmbraNetwork,
   UmbraRegistrationStatus,
 } from "@/features/merchant-profiles/types";
-import {
-  getConfiguredPaymentMint,
-  type ResolvedPaymentMintConfig,
-} from "@/features/payments/mints";
-import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
+import type { ResolvedPaymentMintConfig } from "@/features/payments/mints";
+import { getUmbraCheckoutMint, getUmbraRuntimeNetwork } from "@/lib/umbra/config";
 
 export { mapCheckoutPaymentStatus };
 export type { CheckoutPaymentStatus };
@@ -107,17 +104,17 @@ function formatSolanaPayAmount(amount: number) {
 }
 
 export function getCheckoutPaymentConfig(): CheckoutPaymentConfig {
-  const runtimeConfig = getUmbraRuntimeConfig();
+  const network = getUmbraRuntimeNetwork();
   const receiverAddress = process.env.NEXT_PUBLIC_CHECKOUT_RECIPIENT_ADDRESS?.trim();
   let mint: ResolvedPaymentMintConfig;
 
   try {
-    mint = getConfiguredPaymentMint(runtimeConfig.network);
+    mint = getUmbraCheckoutMint();
     validatePublicKey(mint.address, `${mint.displayName} mint`);
   } catch (error) {
     return {
       isConfigured: false,
-      network: runtimeConfig.network,
+      network,
       error:
         error instanceof Error
           ? error.message
@@ -130,7 +127,7 @@ export function getCheckoutPaymentConfig(): CheckoutPaymentConfig {
   if (!receiverAddress) {
     return {
       isConfigured: false,
-      network: runtimeConfig.network,
+      network,
       error:
         "Payment address not configured. Add NEXT_PUBLIC_CHECKOUT_RECIPIENT_ADDRESS to enable QR checkout.",
       receiverAddress: null,
@@ -141,14 +138,14 @@ export function getCheckoutPaymentConfig(): CheckoutPaymentConfig {
   try {
     return {
       isConfigured: true,
-      network: runtimeConfig.network,
+      network,
       receiverAddress: validatePublicKey(receiverAddress, "Payment address"),
       mint,
     };
   } catch (error) {
     return {
       isConfigured: false,
-      network: runtimeConfig.network,
+      network,
       error:
         error instanceof Error
           ? error.message

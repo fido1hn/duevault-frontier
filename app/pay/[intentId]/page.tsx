@@ -32,6 +32,7 @@ import {
   getPaymentMintConfig,
   type PaymentMintId,
 } from "@/features/payments/mints";
+import { getUmbraRuntimeNetwork } from "@/lib/umbra/config";
 
 export const dynamic = "force-dynamic";
 
@@ -148,7 +149,7 @@ function paymentIntentToCheckoutRecord(
     dueLong: paymentIntentDueLabel(intent),
     lineItems: paymentIntentLineItems(intent),
     status: "Sent",
-    merchantUmbraNetwork: "devnet",
+    merchantUmbraNetwork: getUmbraRuntimeNetwork(),
     merchantUmbraStatus: "not_setup",
     merchantUmbraWalletAddress: null,
     latestUmbraPayment: null,
