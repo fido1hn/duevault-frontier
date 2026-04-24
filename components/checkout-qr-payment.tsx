@@ -20,6 +20,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { CheckoutUmbraPayment } from "@/components/checkout-umbra-payment";
 import { Separator } from "@/components/ui/separator";
 import {
+  getCheckoutPaymentDisplayStatus,
   mapCheckoutPaymentStatus,
   type CheckoutPaymentStatus,
 } from "@/features/checkout/status";
@@ -78,25 +79,32 @@ function PaymentStatusPanel({
   lastChecked,
   onRefresh,
   paymentStatus,
+  presentationMode,
   statusEndpoint,
 }: {
   isRefreshing: boolean;
   lastChecked: Date | null;
   onRefresh: () => void;
   paymentStatus: CheckoutPaymentStatus;
+  presentationMode: CheckoutPaymentViewModel["presentationMode"];
   statusEndpoint: string | null;
 }) {
+  const displayPaymentStatus = getCheckoutPaymentDisplayStatus(
+    paymentStatus,
+    presentationMode,
+  );
+
   return (
     <div className="rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div
-            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${statusToneStyles[paymentStatus.statusTone]}`}
+            className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium ${statusToneStyles[displayPaymentStatus.statusTone]}`}
           >
-            {paymentStatus.statusLabel}
+            {displayPaymentStatus.statusLabel}
           </div>
           <p className="mt-2 text-xs leading-relaxed text-slate-500">
-            {paymentStatus.statusDescription}
+            {displayPaymentStatus.statusDescription}
           </p>
         </div>
         {statusEndpoint && (
@@ -120,8 +128,8 @@ function PaymentStatusPanel({
       <div className="mt-4 grid grid-cols-3 gap-2">
         {statusSteps.map((step, index) => {
           const stepNumber = index + 1;
-          const isComplete = paymentStatus.statusStep > stepNumber;
-          const isCurrent = paymentStatus.statusStep === stepNumber;
+          const isComplete = displayPaymentStatus.statusStep > stepNumber;
+          const isCurrent = displayPaymentStatus.statusStep === stepNumber;
 
           return (
             <div key={step} className="flex flex-col gap-2">
@@ -152,7 +160,9 @@ function PaymentStatusPanel({
       </div>
 
       <p className="mt-4 text-[11px] text-slate-400">
-        Last checked: {formatLastChecked(lastChecked)}
+        {presentationMode === "demo"
+          ? "Static preview"
+          : `Last checked: ${formatLastChecked(lastChecked)}`}
       </p>
     </div>
   );
@@ -166,6 +176,7 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
     );
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
+  const isDemoPresentation = checkout.presentationMode === "demo";
 
   useEffect(() => {
     setPaymentStatus(checkout.paymentStatus);
@@ -292,8 +303,20 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
               lastChecked={lastChecked}
               onRefresh={() => void refreshPaymentStatus()}
               paymentStatus={paymentStatus}
+              presentationMode={checkout.presentationMode}
               statusEndpoint={checkout.statusEndpoint}
             />
+
+            {isDemoPresentation && checkout.demoNotice && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <p className="text-xs font-semibold tracking-[0.18em] text-emerald-800 uppercase">
+                  Demo checkout
+                </p>
+                <p className="mt-2 text-sm leading-relaxed text-emerald-950">
+                  {checkout.demoNotice}
+                </p>
+              </div>
+            )}
 
             {!checkout.configurationError && checkout.mintNotice && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -320,6 +343,7 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
               <CheckoutUmbraPayment
                 amountDisplay={checkout.amountDisplay}
                 mint={checkout.mintDisplayName}
+                mode={checkout.presentationMode}
                 umbra={{
                   ...checkout.umbra,
                   latestPayment: latestUmbraPayment,
@@ -331,7 +355,7 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
                 }}
                 onStatusRefresh={() => void refreshPaymentStatus({ quiet: true })}
               />
-            ) : (
+            ) : isDemoPresentation ? null : (
               <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 text-center">
                 <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-500 shadow-sm">
                   <QrCode className="size-3.5" />
@@ -349,44 +373,23 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
               </div>
             )}
 
-            <div className="grid gap-3">
-              <div className="rounded-lg border border-slate-100 bg-white p-4">
-                <p className="text-xs font-medium text-slate-500">Receiver</p>
-                <div className="mt-2 flex items-center justify-between gap-3">
-                  <p className="truncate font-mono text-sm text-slate-900">
-                    {checkout.receiverAddress
-                      ? truncateAddress(checkout.receiverAddress)
-                      : "Not configured"}
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!checkout.receiverAddress}
-                    onClick={() => copyValue("Receiver address", checkout.receiverAddress)}
-                  >
-                    <Copy className="size-3.5" />
-                    Copy
-                  </Button>
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
+            {!isDemoPresentation && (
+              <div className="grid gap-3">
                 <div className="rounded-lg border border-slate-100 bg-white p-4">
-                  <p className="text-xs font-medium text-slate-500">Amount</p>
+                  <p className="text-xs font-medium text-slate-500">Receiver</p>
                   <div className="mt-2 flex items-center justify-between gap-3">
-                    <p className="font-mono text-sm text-slate-900">
-                      {checkout.amountNumber} {checkout.mintDisplayName}
+                    <p className="truncate font-mono text-sm text-slate-900">
+                      {checkout.receiverAddress
+                        ? truncateAddress(checkout.receiverAddress)
+                        : "Not configured"}
                     </p>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
+                      disabled={!checkout.receiverAddress}
                       onClick={() =>
-                        copyValue(
-                          "Amount",
-                          `${checkout.amountNumber} ${checkout.mintDisplayName}`,
-                        )
+                        copyValue("Receiver address", checkout.receiverAddress)
                       }
                     >
                       <Copy className="size-3.5" />
@@ -395,46 +398,75 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-slate-100 bg-white p-4">
-                  <p className="text-xs font-medium text-slate-500">
-                    {checkout.source === "payment_intent"
-                      ? "Payment memo"
-                      : "Invoice memo"}
-                  </p>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <p className="font-mono text-sm text-slate-900">
-                      {checkout.memo}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-lg border border-slate-100 bg-white p-4">
+                    <p className="text-xs font-medium text-slate-500">Amount</p>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <p className="font-mono text-sm text-slate-900">
+                        {checkout.amountNumber} {checkout.mintDisplayName}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          copyValue(
+                            "Amount",
+                            `${checkout.amountNumber} ${checkout.mintDisplayName}`,
+                          )
+                        }
+                      >
+                        <Copy className="size-3.5" />
+                        Copy
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-100 bg-white p-4">
+                    <p className="text-xs font-medium text-slate-500">
+                      {checkout.source === "payment_intent"
+                        ? "Payment memo"
+                        : "Invoice memo"}
                     </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        copyValue(
-                          checkout.source === "payment_intent"
-                            ? "Payment memo"
-                            : "Invoice memo",
-                          checkout.memo,
-                        )
-                      }
-                    >
-                      <Copy className="size-3.5" />
-                      Copy
-                    </Button>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <p className="font-mono text-sm text-slate-900">
+                        {checkout.memo}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          copyValue(
+                            checkout.source === "payment_intent"
+                              ? "Payment memo"
+                              : "Invoice memo",
+                            checkout.memo,
+                          )
+                        }
+                      >
+                        <Copy className="size-3.5" />
+                        Copy
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="flex items-start gap-3 rounded-lg border border-slate-100 bg-slate-50 p-4">
               <Shield className="mt-0.5 size-5 shrink-0 text-slate-400" />
               <div className="text-xs leading-relaxed text-slate-500">
                 <p className="mb-1 font-medium text-slate-700">
-                  {checkout.paymentMode === "umbra"
+                  {isDemoPresentation
+                    ? "Umbra mainnet demo preview"
+                    : checkout.paymentMode === "umbra"
                     ? "Private settlement via Umbra"
                     : "Direct Solana Pay"}
                 </p>
-                {checkout.paymentMode === "umbra"
+                {isDemoPresentation
+                  ? "This read-only preview shows what an Umbra checkout looks like on mainnet. No wallet connection or payment is required."
+                  : checkout.paymentMode === "umbra"
                   ? "This payment uses the merchant's Umbra receiver for private settlement."
                   : "This QR points to the merchant payment receiver for this checkout."}
               </div>

@@ -153,7 +153,7 @@ export default function Home() {
                   size="lg"
                   variant="outline"
                   className="h-14 bg-card/45 px-8 text-base backdrop-blur">
-                  <Link href="/demo/pay/DV-1007">View Sample Checkout</Link>
+                  <Link href="/demo/pay/DV-1007">View Demo Checkout</Link>
                 </Button>
               </div>
 

@@ -18,6 +18,24 @@ export type CheckoutPaymentStatus = {
   statusStep: CheckoutPaymentStatusStep;
 };
 
+export function getCheckoutPaymentDisplayStatus(
+  paymentStatus: CheckoutPaymentStatus,
+  presentationMode: "live" | "demo",
+) {
+  if (
+    presentationMode === "demo" &&
+    paymentStatus.rawStatus === "Sent" &&
+    paymentStatus.statusTone === "waiting"
+  ) {
+    return {
+      ...paymentStatus,
+      statusDescription: "Preview state for the Umbra mainnet demo checkout.",
+    };
+  }
+
+  return paymentStatus;
+}
+
 export function mapCheckoutPaymentStatus(
   status: InvoiceStatus,
   latestUmbraPayment?: PublicUmbraPaymentStatus | null,

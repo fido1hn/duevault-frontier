@@ -43,6 +43,7 @@ import type {
 type CheckoutUmbraPaymentProps = {
   amountDisplay: string;
   mint: string;
+  mode?: "live" | "demo";
   onPaymentSaved: (
     payment: PublicUmbraPaymentStatus,
     status: InvoiceStatus,
@@ -121,11 +122,74 @@ function MissingPrivyFallback() {
   );
 }
 
-export function CheckoutUmbraPayment(props: CheckoutUmbraPaymentProps) {
+export function CheckoutUmbraPayment({
+  mode = "live",
+  ...props
+}: CheckoutUmbraPaymentProps) {
+  if (mode === "demo") {
+    return <CheckoutUmbraPaymentDemo {...props} />;
+  }
+
   return (
     <AppPrivyProvider missingAppIdFallback={<MissingPrivyFallback />}>
       <CheckoutUmbraPaymentInner {...props} />
     </AppPrivyProvider>
+  );
+}
+
+function CheckoutUmbraPaymentDemo({
+  amountDisplay,
+  mint,
+  umbra,
+}: CheckoutUmbraPaymentProps) {
+  return (
+    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-emerald-700 shadow-sm">
+              <ShieldCheck className="size-3.5" />
+              Umbra private checkout
+            </div>
+            <p className="mt-3 text-sm font-medium text-slate-900">
+              {amountDisplay}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600">
+              Mainnet preview for private {mint} settlement.
+            </p>
+          </div>
+          <div className="rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-medium text-emerald-800">
+            Demo preview only
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-white/70 bg-white p-4 text-sm leading-relaxed text-slate-700">
+          This page shows the final Umbra checkout presentation without starting
+          wallet, Privy, or on-chain payment flows.
+        </div>
+
+        <div className="grid gap-2 sm:grid-cols-3">
+          <div className="rounded-lg border border-white/70 bg-white p-3">
+            <p className="text-xs font-medium text-slate-500">Merchant receiver</p>
+            <p className="mt-1 truncate font-mono text-sm text-slate-900">
+              {umbra.merchantWalletAddress
+                ? truncateAddress(umbra.merchantWalletAddress)
+                : "Not ready"}
+            </p>
+          </div>
+          <div className="rounded-lg border border-white/70 bg-white p-3">
+            <p className="text-xs font-medium text-slate-500">Settlement mint</p>
+            <p className="mt-1 text-sm text-slate-900">{mint}</p>
+          </div>
+          <div className="rounded-lg border border-white/70 bg-white p-3">
+            <p className="text-xs font-medium text-slate-500">Network</p>
+            <p className="mt-1 text-sm text-slate-900 capitalize">
+              {umbra.network}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

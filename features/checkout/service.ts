@@ -19,6 +19,8 @@ import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 export { mapCheckoutPaymentStatus };
 export type { CheckoutPaymentStatus };
 
+export type CheckoutPresentationMode = "live" | "demo";
+
 export type CheckoutPaymentLineItem = {
   id: string;
   description: string;
@@ -50,6 +52,8 @@ export type CheckoutPaymentViewModel = {
   message: string;
   source: CheckoutPaymentSource;
   privacyRail: PrivacyRail;
+  presentationMode: CheckoutPresentationMode;
+  demoNotice: string | null;
   paymentMode: "solana_pay" | "umbra";
   statusEndpoint: string | null;
   paymentStatus: CheckoutPaymentStatus;

@@ -285,6 +285,8 @@ function buildCheckoutViewModel(invoice: CheckoutRecord): CheckoutPaymentViewMod
     message,
     source: invoice.source,
     privacyRail: invoice.privacyRail,
+    presentationMode: "live",
+    demoNotice: null,
     paymentMode: isUmbraCheckout ? "umbra" : "solana_pay",
     statusEndpoint:
       invoice.source === "database" && invoice.publicId
