@@ -52,7 +52,12 @@ function readUmbraUrlEnv(
   name: "NEXT_PUBLIC_UMBRA_RPC_URL" | "NEXT_PUBLIC_UMBRA_RPC_SUBSCRIPTIONS_URL",
   fallback: string,
 ) {
-  const value = process.env[name]?.trim();
+  // Next.js only statically replaces NEXT_PUBLIC_* vars with literal dot notation.
+  // Dynamic bracket access (process.env[name]) is never replaced in the client bundle.
+  const value =
+    name === "NEXT_PUBLIC_UMBRA_RPC_URL"
+      ? process.env.NEXT_PUBLIC_UMBRA_RPC_URL?.trim()
+      : process.env.NEXT_PUBLIC_UMBRA_RPC_SUBSCRIPTIONS_URL?.trim();
 
   if (value) {
     return value;
