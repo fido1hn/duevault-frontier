@@ -192,7 +192,7 @@ async function ensureCustomerUmbraRegistration({
   onStep?: (step: CustomerUmbraPaymentStepId) => void;
   walletAddress: string;
 }) {
-  onStep?.("customer_account");
+  onStep?.("customer_registration");
 
   try {
     const currentAccount = await queryDueVaultUserRegistration(
@@ -201,7 +201,6 @@ async function ensureCustomerUmbraRegistration({
     );
 
     if (isUmbraUserFullyRegistered(currentAccount)) {
-      onStep?.("customer_verifying");
       return;
     }
   } catch (error) {
@@ -209,39 +208,10 @@ async function ensureCustomerUmbraRegistration({
   }
 
   try {
-    await registerDueVaultUser(config, {
-      callbacks: {
-        userAccountInitialisation: {
-          pre: async () => {
-            onStep?.("customer_account");
-          },
-          post: async () => {
-            onStep?.("customer_encryption");
-          },
-        },
-        registerX25519PublicKey: {
-          pre: async () => {
-            onStep?.("customer_encryption");
-          },
-          post: async () => {
-            onStep?.("customer_anonymous");
-          },
-        },
-        registerUserForAnonymousUsage: {
-          pre: async () => {
-            onStep?.("customer_anonymous");
-          },
-          post: async () => {
-            onStep?.("customer_verifying");
-          },
-        },
-      },
-    });
+    await registerDueVaultUser(config);
   } catch (error) {
     throw new Error(describeUmbraFailure("Customer Umbra setup", error));
   }
-
-  onStep?.("customer_verifying");
 
   try {
     const verifiedAccount = await queryDueVaultUserRegistration(
@@ -318,51 +288,16 @@ export async function runCustomerUmbraPayment({
     );
   }
 
-  onStep?.("preflight");
-
-  try {
-    await assertCustomerPaymentReadiness({
-      amountAtomic,
-      config,
-      mintAddress,
-      mintDecimals,
-      mintDisplayName,
-      payerWalletAddress: wallet.address,
-      rpcUrl: runtimeConfig.rpcUrl,
-    });
-  } catch (error) {
-    throw new Error(describeUmbraFailure("Customer balance check", error));
-  }
-
   await ensureCustomerUmbraRegistration({
     config,
     onStep,
     walletAddress: wallet.address,
   });
 
-  onStep?.("payment_preflight");
-
-  try {
-    await assertCustomerPaymentReadiness({
-      amountAtomic,
-      config,
-      mintAddress,
-      mintDecimals,
-      mintDisplayName,
-      payerWalletAddress: wallet.address,
-      rpcUrl: runtimeConfig.rpcUrl,
-    });
-  } catch (error) {
-    throw new Error(
-      describeUmbraFailure("Customer payment balance check", error),
-    );
-  }
-
-  onStep?.("master_seed");
+  onStep?.("preparing_payment");
   const invoiceReference = optionalDataFromHex(optionalData);
 
   try {
-    onStep?.("proof_generation");
     const signatures = await createPrivatePayment(config, {
       destinationAddress: merchantUmbraWalletAddress,
       mint: mintAddress,
