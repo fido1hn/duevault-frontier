@@ -5,21 +5,11 @@ import type {
   UseSignMessage,
   UseSignTransaction,
 } from "@privy-io/react-auth/solana";
-import { address } from "@solana/kit";
-import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
-import type { MasterSeed, U128 } from "@umbra-privacy/sdk/types";
-import {
-  findActiveStealthPoolPda,
-  findProtocolConfigPda,
-  findProtocolFeeVaultPda,
-  findTokenPoolPda,
-  findVerifyingKeyPda,
-} from "@umbra-privacy/sdk/utils";
+import type { MasterSeed } from "@umbra-privacy/sdk/types";
 
 import { createPrivyUmbraSigner } from "@/features/checkout/privy-umbra-signer";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import {
-  createDueVaultClient,
   createPrivatePayment,
   type DueVaultConfig,
   isUmbraUserFullyRegistered,
@@ -30,14 +20,8 @@ import {
 export type CustomerUmbraPaymentStepId =
   | "wallet"
   | "checking"
-  | "preflight"
-  | "customer_account"
-  | "customer_encryption"
-  | "customer_anonymous"
-  | "customer_verifying"
-  | "payment_preflight"
-  | "master_seed"
-  | "proof_generation"
+  | "customer_registration"
+  | "preparing_payment"
   | "create_utxo"
   | "saving"
   | "complete"
@@ -67,32 +51,6 @@ type RunCustomerUmbraPaymentInput = {
   optionalData: string;
   onStep?: (step: CustomerUmbraPaymentStepId) => void;
 };
-
-const PUBLIC_UTXO_PROOF_ACCOUNT_SIZE = 563;
-const CUSTOMER_SOL_FEE_BUFFER_LAMPORTS = 50_000_000;
-const SPL_TOKEN_PROGRAM_ID = new PublicKey(
-  "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
-);
-const TOKEN_2022_PROGRAM_ADDRESS =
-  "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb";
-const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
-  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
-);
-const CREATE_DEPOSIT_FROM_PUBLIC_BALANCE_INSTRUCTION_SEED_BYTES = [
-  94, 35, 209, 185, 160, 81, 246, 69, 49, 174, 241, 12, 73, 248, 43, 89,
-] as const;
-
-function u128FromLittleEndian(bytes: readonly number[]) {
-  return bytes.reduce(
-    (value, byte, index) => value | (BigInt(byte) << BigInt(index * 8)),
-    0n,
-  ) as U128;
-}
-
-const CREATE_DEPOSIT_FROM_PUBLIC_BALANCE_INSTRUCTION_SEED =
-  u128FromLittleEndian(
-    CREATE_DEPOSIT_FROM_PUBLIC_BALANCE_INSTRUCTION_SEED_BYTES,
-  );
 
 function createClickScopedMasterSeedStorage(): NonNullable<
   DueVaultConfig["masterSeedStorage"]
@@ -313,243 +271,6 @@ function optionalDataFromHex(value: string) {
   }
 
   return bytes;
-}
-
-function formatSol(lamports: number) {
-  return (lamports / LAMPORTS_PER_SOL).toLocaleString("en-US", {
-    maximumFractionDigits: 4,
-  });
-}
-
-function formatAtomicToken(value: bigint, decimals: number) {
-  const divisor = 10n ** BigInt(decimals);
-  const whole = value / divisor;
-  const fractional = value % divisor;
-
-  if (fractional === 0n) {
-    return whole.toString();
-  }
-
-  return `${whole}.${fractional
-    .toString()
-    .padStart(decimals, "0")
-    .replace(/0+$/, "")}`;
-}
-
-function deriveAssociatedTokenAddress({
-  mint,
-  owner,
-  tokenProgram,
-}: {
-  mint: PublicKey;
-  owner: PublicKey;
-  tokenProgram: PublicKey;
-}) {
-  return PublicKey.findProgramAddressSync(
-    [owner.toBuffer(), tokenProgram.toBuffer(), mint.toBuffer()],
-    ASSOCIATED_TOKEN_PROGRAM_ID,
-  )[0];
-}
-
-async function getAssociatedTokenBalance(
-  connection: Connection,
-  owner: PublicKey,
-  mint: PublicKey,
-  mintDisplayName: string,
-  network: string,
-) {
-  const mintInfo = await connection.getAccountInfo(mint, "confirmed");
-
-  if (!mintInfo) {
-    throw new Error(
-      `Checkout mint account ${mint.toBase58()} does not exist on ${network}.`,
-    );
-  }
-
-  if (
-    !mintInfo.owner.equals(SPL_TOKEN_PROGRAM_ID) &&
-    mintInfo.owner.toBase58() !== TOKEN_2022_PROGRAM_ADDRESS
-  ) {
-    throw new Error(
-      `Checkout mint ${mint.toBase58()} is not owned by a supported SPL token program.`,
-    );
-  }
-
-  const associatedTokenAddress = deriveAssociatedTokenAddress({
-    mint,
-    owner,
-    tokenProgram: mintInfo.owner,
-  });
-  const account = await connection.getParsedAccountInfo(
-    associatedTokenAddress,
-    "confirmed",
-  );
-
-  if (!account.value) {
-    throw new Error(
-      `Customer wallet does not have the associated token account Umbra spends from (${associatedTokenAddress.toBase58()}). Fund that account with ${mintDisplayName} and retry.`,
-    );
-  }
-
-  const data = account.value.data;
-
-  if (!isRecord(data) || !isRecord(data.parsed)) {
-    throw new Error(
-      `Customer associated token account ${associatedTokenAddress.toBase58()} could not be parsed.`,
-    );
-  }
-
-  const info = data.parsed.info;
-
-  if (!isRecord(info) || !isRecord(info.tokenAmount)) {
-    throw new Error(
-      `Customer associated token account ${associatedTokenAddress.toBase58()} is not an initialized token account.`,
-    );
-  }
-
-  const amount = info.tokenAmount.amount;
-
-  if (typeof amount !== "string") {
-    throw new Error(
-      `Customer associated token account ${associatedTokenAddress.toBase58()} has an unreadable token balance.`,
-    );
-  }
-
-  return {
-    amount: BigInt(amount),
-    associatedTokenAddress: associatedTokenAddress.toBase58(),
-    tokenProgram: mintInfo.owner,
-  };
-}
-
-async function assertUmbraPoolReadiness({
-  config,
-  connection,
-  mint,
-  tokenProgram,
-}: {
-  config: DueVaultConfig;
-  connection: Connection;
-  mint: PublicKey;
-  tokenProgram: PublicKey;
-}) {
-  const client = await createDueVaultClient(config);
-  const programId = client.networkConfig.programId;
-  const mintAddress = address(mint.toBase58());
-  const [feeVault, protocolConfig, stealthPool, tokenPool, verifyingKey] =
-    await Promise.all([
-      findProtocolFeeVaultPda(
-        CREATE_DEPOSIT_FROM_PUBLIC_BALANCE_INSTRUCTION_SEED,
-        mintAddress,
-        0n as U128,
-        programId,
-      ).then(([pda]) => pda),
-      findProtocolConfigPda(programId),
-      findActiveStealthPoolPda(programId),
-      findTokenPoolPda(mintAddress, programId),
-      findVerifyingKeyPda(
-        CREATE_DEPOSIT_FROM_PUBLIC_BALANCE_INSTRUCTION_SEED,
-        programId,
-      ),
-    ]);
-  const tokenPoolSplAta = deriveAssociatedTokenAddress({
-    mint,
-    owner: new PublicKey(tokenPool),
-    tokenProgram,
-  }).toBase58();
-  const requiredAccounts = [
-    { label: "fee vault", address: feeVault },
-    { label: "protocol config", address: protocolConfig },
-    { label: "stealth pool", address: stealthPool },
-    { label: "token pool", address: tokenPool },
-    { label: "token pool ATA", address: tokenPoolSplAta },
-    { label: "ZK verifying key", address: verifyingKey },
-  ];
-  const accountInfos = await connection.getMultipleAccountsInfo(
-    requiredAccounts.map((account) => new PublicKey(account.address)),
-    "confirmed",
-  );
-  const missingAccounts = requiredAccounts.filter(
-    (_account, index) => accountInfos[index] === null,
-  );
-
-  if (missingAccounts.length > 0) {
-    throw new Error(
-      `Umbra ${config.network} is not initialized for mint ${mint.toBase58()}; missing ${missingAccounts
-        .map((account) => `${account.label} ${account.address}`)
-        .join(", ")}.`,
-    );
-  }
-}
-
-async function assertCustomerPaymentReadiness({
-  amountAtomic,
-  config,
-  mintAddress,
-  mintDecimals,
-  mintDisplayName,
-  payerWalletAddress,
-  rpcUrl,
-}: {
-  amountAtomic: string;
-  config: DueVaultConfig;
-  mintAddress: string;
-  mintDecimals: number;
-  mintDisplayName: string;
-  payerWalletAddress: string;
-  rpcUrl: string;
-}) {
-  const connection = new Connection(rpcUrl, "confirmed");
-  const payer = new PublicKey(payerWalletAddress);
-  const mint = new PublicKey(mintAddress);
-  const [payerLamports, proofAccountRentLamports, tokenBalance] =
-    await Promise.all([
-      connection.getBalance(payer, "confirmed"),
-      connection.getMinimumBalanceForRentExemption(
-        PUBLIC_UTXO_PROOF_ACCOUNT_SIZE,
-      ),
-      getAssociatedTokenBalance(
-        connection,
-        payer,
-        mint,
-        mintDisplayName,
-        config.network,
-      ),
-    ]);
-  const requiredLamports =
-    proofAccountRentLamports + CUSTOMER_SOL_FEE_BUFFER_LAMPORTS;
-  const requiredAmount = BigInt(amountAtomic);
-
-  if (payerLamports < requiredLamports) {
-    throw new Error(
-      `Customer wallet needs at least ${formatSol(
-        requiredLamports,
-      )} ${config.network} SOL for Umbra setup, proof account rent, and transaction fees. Current balance is ${formatSol(
-        payerLamports,
-      )} SOL.`,
-    );
-  }
-
-  if (tokenBalance.amount < requiredAmount) {
-    throw new Error(
-      `Customer wallet needs ${formatAtomicToken(
-        requiredAmount,
-        mintDecimals,
-      )} ${mintDisplayName} in the associated token account Umbra spends from (${
-        tokenBalance.associatedTokenAddress
-      }). Current balance there is ${formatAtomicToken(
-        tokenBalance.amount,
-        mintDecimals,
-      )} ${mintDisplayName}.`,
-    );
-  }
-
-  await assertUmbraPoolReadiness({
-    config,
-    connection,
-    mint,
-    tokenProgram: tokenBalance.tokenProgram,
-  });
 }
 
 export async function runCustomerUmbraPayment({
