@@ -20,6 +20,11 @@ type InvoiceResponse = {
   error?: string;
 };
 
+type ProofPacketResponse = {
+  packet?: ProofPacket;
+  error?: string;
+};
+
 export async function listInvoicesClient(getAuthToken: GetAuthToken) {
   const response = await authenticatedFetch(
     "/api/invoices",
@@ -118,18 +123,15 @@ export async function confirmUmbraInvoicePaymentClient(
   return payload.invoice;
 }
 
-type ProofPacketResponse = {
-  packet?: ProofPacket;
-  error?: string;
-};
-
 export async function getInvoiceProofPacketClient(
   invoiceId: string,
   getAuthToken: GetAuthToken,
 ) {
   const response = await authenticatedFetch(
     `/api/invoices/${encodeURIComponent(invoiceId)}/proof-packet`,
-    { cache: "no-store" },
+    {
+      cache: "no-store",
+    },
     getAuthToken,
   );
   const payload = (await response.json()) as ProofPacketResponse;
