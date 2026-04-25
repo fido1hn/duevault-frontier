@@ -16,6 +16,7 @@ import { useInvoicesQuery } from "@/features/invoices/queries";
 
 export default function ProofsPage() {
   const invoicesQuery = useInvoicesQuery();
+  const { getAccessToken } = usePrivy();
   const invoices = invoicesQuery.data ?? [];
   const eligibleInvoices = invoices.filter(
     (invoice) => invoice.latestUmbraPayment?.status === "confirmed",
@@ -28,8 +29,6 @@ export default function ProofsPage() {
       ? invoicesQuery.error.message
       : "Unable to load proof data."
     : "";
-
-  const { getAccessToken } = usePrivy();
   const [generating, setGenerating] = useState<Set<string>>(new Set());
   const [packetErrors, setPacketErrors] = useState<Record<string, string>>({});
 
@@ -52,8 +51,10 @@ export default function ProofsPage() {
     const link = document.createElement("a");
     link.href = url;
     link.download = `proof-${invoiceId}.json`;
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   async function handleDownload(invoiceId: string) {
