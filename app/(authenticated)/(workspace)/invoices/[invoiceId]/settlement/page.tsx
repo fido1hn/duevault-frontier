@@ -1,20 +1,29 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useParams } from "next/navigation";
+import { useStandardWallets } from "@privy-io/react-auth/solana";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   CheckCircle2,
   Clock,
   ExternalLink,
+  Loader2,
   Lock,
   ShieldCheck,
 } from "lucide-react";
 
+import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { createPrivyUmbraSigner } from "@/features/checkout/privy-umbra-signer";
 import { useInvoiceQuery } from "@/features/invoices/queries";
 import { getPaymentMintConfig } from "@/features/payments/mints";
+import { usePrivyUmbraSigner } from "@/hooks/use-privy-umbra-signer";
+import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
+import { claimIncomingPayments } from "@/lib/umbra/sdk";
 
 function truncate(value: string) {
   return `${value.slice(0, 8)}...${value.slice(-8)}`;
@@ -22,6 +31,10 @@ function truncate(value: string) {
 
 export default function SettlementPage() {
   const params = useParams<{ invoiceId: string }>();
+  const { profile } = useMerchantProfile();
+  const standardWallets = useStandardWallets();
+  const { wallet: merchantWallet, signTransaction, signMessage } =
+    usePrivyUmbraSigner(profile.walletAddress);
   const invoiceQuery = useInvoiceQuery(params.invoiceId);
   const invoice = invoiceQuery.data ?? null;
   const latestUmbraPayment = invoice?.latestUmbraPayment ?? null;
@@ -33,6 +46,45 @@ export default function SettlementPage() {
       ? invoiceQuery.error.message
       : "Unable to load settlement details."
     : "";
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [claimError, setClaimError] = useState("");
+  const [claimed, setClaimed] = useState(false);
+
+  async function handleClaimSettlement() {
+    if (!merchantWallet) {
+      const msg = "Connect the Solana wallet attached to this merchant profile.";
+      setClaimError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    setClaimError("");
+    setIsClaiming(true);
+
+    try {
+      const runtimeConfig = getUmbraRuntimeConfig();
+      const signer = createPrivyUmbraSigner({
+        wallet: merchantWallet,
+        signTransaction,
+        signMessage,
+        network: runtimeConfig.network,
+      });
+      await claimIncomingPayments({
+        ...runtimeConfig,
+        signer,
+        preferPollingTransactionForwarder: true,
+      });
+      setClaimed(true);
+      toast.success("Settlement claimed successfully.");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unable to claim settlement.";
+      setClaimError(message);
+      toast.error(message);
+    } finally {
+      setIsClaiming(false);
+    }
+  }
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-8 p-6 md:p-8">
@@ -144,17 +196,58 @@ export default function SettlementPage() {
                 </div>
 
                 {isConfirmed && (
-                  <div className="flex items-start gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4">
-                    <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" />
-                    <div>
-                      <h3 className="font-medium text-emerald-800 dark:text-emerald-400">
-                        Merchant Claimability Confirmed
-                      </h3>
-                      <p className="mt-1 text-sm text-emerald-700/80 dark:text-emerald-500/80">
-                        The merchant wallet has confirmed this payment is claimable.
-                        Settlement execution can be layered on this verified state.
-                      </p>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-start gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4">
+                      <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" />
+                      <div>
+                        <h3 className="font-medium text-emerald-800 dark:text-emerald-400">
+                          Merchant Claimability Confirmed
+                        </h3>
+                        <p className="mt-1 text-sm text-emerald-700/80 dark:text-emerald-500/80">
+                          The merchant wallet has confirmed this payment is claimable.
+                          Click below to claim funds into your Umbra encrypted balance.
+                        </p>
+                      </div>
                     </div>
+
+                    {claimed && (
+                      <div className="flex items-start gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4">
+                        <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" />
+                        <div>
+                          <h3 className="font-medium text-emerald-800 dark:text-emerald-400">
+                            Settlement Claimed
+                          </h3>
+                          <p className="mt-1 text-sm text-emerald-700/80 dark:text-emerald-500/80">
+                            The payment has been claimed into your Umbra encrypted balance.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {claimError && (
+                      <p className="text-sm text-destructive">{claimError}</p>
+                    )}
+
+                    <Button
+                      size="lg"
+                      className="h-14 w-full text-base"
+                      onClick={handleClaimSettlement}
+                      disabled={!standardWallets.ready || isClaiming || claimed}
+                    >
+                      {isClaiming ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin" /> Claiming Settlement…
+                        </>
+                      ) : claimed ? (
+                        <>
+                          <CheckCircle2 className="size-4" /> Settlement Claimed
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="size-4" /> Claim Settlement
+                        </>
+                      )}
+                    </Button>
                   </div>
                 )}
 
