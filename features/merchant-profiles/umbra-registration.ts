@@ -1,10 +1,13 @@
 "use client";
 
-import { createSignerFromWalletAccount } from "@umbra-privacy/sdk";
+import type {
+  ConnectedStandardSolanaWallet,
+  UseSignMessage,
+  UseSignTransaction,
+} from "@privy-io/react-auth/solana";
 import type { QueryUserAccountResult } from "@umbra-privacy/sdk/types";
-import type { SolanaStandardWallet } from "@privy-io/react-auth/solana";
-import type { Wallet, WalletAccount } from "@wallet-standard/base";
 
+import { createPrivyUmbraSigner } from "@/features/checkout/privy-umbra-signer";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import {
   isUmbraUserFullyRegistered,
@@ -27,14 +30,10 @@ export type MerchantUmbraRegistrationStepId =
   | "error";
 
 type RunMerchantUmbraRegistrationInput = {
-  walletAddress: string;
-  standardWallets: SolanaStandardWallet[];
+  wallet: ConnectedStandardSolanaWallet;
+  signTransaction: UseSignTransaction["signTransaction"];
+  signMessage: UseSignMessage["signMessage"];
   onStep?: (step: MerchantUmbraRegistrationStepId) => void;
-};
-
-type MatchedStandardWallet = {
-  wallet: SolanaStandardWallet;
-  account: SolanaStandardWallet["accounts"][number];
 };
 
 function getErrorMessage(error: unknown) {
@@ -62,25 +61,6 @@ function describeUmbraFailure(action: string, error: unknown) {
   return `${action} failed${stage ? ` during ${stage}` : ""}: ${message}`;
 }
 
-function findStandardWalletAccount(
-  wallets: SolanaStandardWallet[],
-  walletAddress: string,
-): MatchedStandardWallet | null {
-  for (const wallet of wallets) {
-    const account = wallet.accounts.find(
-      (candidate) => candidate.address === walletAddress,
-    );
-
-    if (account) {
-      return {
-        wallet,
-        account,
-      };
-    }
-  }
-
-  return null;
-}
 
 export function serializeUmbraAccountState(
   account: QueryUserAccountResult,
@@ -102,21 +82,19 @@ export function serializeUmbraAccountState(
 }
 
 export async function runMerchantUmbraRegistration({
-  walletAddress,
-  standardWallets,
+  wallet,
+  signTransaction,
+  signMessage,
   onStep,
 }: RunMerchantUmbraRegistrationInput): Promise<SaveUmbraRegistrationInput> {
-  const matchedWallet = findStandardWalletAccount(standardWallets, walletAddress);
-
-  if (!matchedWallet) {
-    throw new Error("Connect the Solana wallet attached to this merchant profile.");
-  }
-
+  const walletAddress = wallet.address;
   const runtimeConfig = getUmbraRuntimeConfig();
-  const signer = createSignerFromWalletAccount(
-    matchedWallet.wallet as Wallet,
-    matchedWallet.account as WalletAccount,
-  );
+  const signer = createPrivyUmbraSigner({
+    wallet,
+    signTransaction,
+    signMessage,
+    network: runtimeConfig.network,
+  });
   const config = {
     ...runtimeConfig,
     signer,

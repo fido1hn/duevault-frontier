@@ -1,16 +1,17 @@
 "use client";
 
-import {
-  createSignerFromWalletAccount,
-  getClaimableUtxoScannerFunction,
-} from "@umbra-privacy/sdk";
+import { getClaimableUtxoScannerFunction } from "@umbra-privacy/sdk";
 import type { ScannedUtxoData } from "@umbra-privacy/sdk/interfaces";
 import type { MasterSeed, U32 } from "@umbra-privacy/sdk/types";
 import { splitAddressToLowHigh } from "@umbra-privacy/sdk/utils";
 import { address } from "@solana/kit";
-import type { SolanaStandardWallet } from "@privy-io/react-auth/solana";
-import type { Wallet, WalletAccount } from "@wallet-standard/base";
+import type {
+  ConnectedStandardSolanaWallet,
+  UseSignMessage,
+  UseSignTransaction,
+} from "@privy-io/react-auth/solana";
 
+import { createPrivyUmbraSigner } from "@/features/checkout/privy-umbra-signer";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import {
   createDueVaultClient,
@@ -29,19 +30,15 @@ export type MerchantUmbraClaimabilityEvidence = {
 };
 
 type FindMerchantClaimableUmbraPaymentInput = {
-  walletAddress: string;
-  standardWallets: SolanaStandardWallet[];
+  wallet: ConnectedStandardSolanaWallet;
+  signTransaction: UseSignTransaction["signTransaction"];
+  signMessage: UseSignMessage["signMessage"];
   expected: {
     destinationAddress: string;
     payerWalletAddress: string;
     mint: string;
     amountAtomic: string;
   };
-};
-
-type MatchedStandardWallet = {
-  wallet: SolanaStandardWallet;
-  account: SolanaStandardWallet["accounts"][number];
 };
 
 function createClickScopedMasterSeedStorage(): NonNullable<
@@ -69,25 +66,6 @@ function createClickScopedMasterSeedStorage(): NonNullable<
   };
 }
 
-function findStandardWalletAccount(
-  wallets: SolanaStandardWallet[],
-  walletAddress: string,
-): MatchedStandardWallet | null {
-  for (const wallet of wallets) {
-    const account = wallet.accounts.find(
-      (candidate) => candidate.address === walletAddress,
-    );
-
-    if (account) {
-      return {
-        wallet,
-        account,
-      };
-    }
-  }
-
-  return null;
-}
 
 function bytesToHex(bytes: ArrayLike<number>) {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join(
@@ -143,20 +121,17 @@ function serializeClaimabilityEvidence(
 
 export async function findMerchantClaimableUmbraPayment({
   expected,
-  standardWallets,
-  walletAddress,
+  wallet,
+  signTransaction,
+  signMessage,
 }: FindMerchantClaimableUmbraPaymentInput) {
-  const matchedWallet = findStandardWalletAccount(standardWallets, walletAddress);
-
-  if (!matchedWallet) {
-    throw new Error("Connect the Solana wallet attached to this merchant profile.");
-  }
-
   const runtimeConfig = getUmbraRuntimeConfig();
-  const signer = createSignerFromWalletAccount(
-    matchedWallet.wallet as Wallet,
-    matchedWallet.account as WalletAccount,
-  );
+  const signer = createPrivyUmbraSigner({
+    wallet,
+    signTransaction,
+    signMessage,
+    network: runtimeConfig.network,
+  });
   const client = await createDueVaultClient({
     ...runtimeConfig,
     signer,
