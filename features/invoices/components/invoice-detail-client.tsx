@@ -79,7 +79,9 @@ export function InvoiceDetailClient({
     setConfirmationError("");
 
     if (!merchantWallet) {
-      setConfirmationError("Connect the Solana wallet attached to this merchant profile.");
+      const msg = "Connect the Solana wallet attached to this merchant profile.";
+      setConfirmationError(msg);
+      toast.error(msg);
       return;
     }
 

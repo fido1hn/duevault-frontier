@@ -69,8 +69,10 @@ function SettingsContent() {
     setRegistrationError("");
 
     if (!merchantWallet) {
+      const msg = "Connect the Solana wallet attached to this merchant profile.";
       setRegistrationStep("error");
-      setRegistrationError("Connect the Solana wallet attached to this merchant profile.");
+      setRegistrationError(msg);
+      toast.error(msg);
       return;
     }
 
