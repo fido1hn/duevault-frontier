@@ -61,7 +61,6 @@ type SaveUmbraPaymentResponse = {
   error?: string;
 };
 
-
 function truncateAddress(value: string) {
   return `${value.slice(0, 6)}...${value.slice(-6)}`;
 }
