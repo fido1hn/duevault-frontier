@@ -109,6 +109,12 @@ export function createPrivyUmbraSigner({
       const outputs = await signTransaction(...inputs);
       const outputArray = Array.isArray(outputs) ? outputs : [outputs];
 
+      if (outputArray.length !== inputs.length) {
+        throw new Error(
+          `Privy returned ${outputArray.length} signed transaction(s) but ${inputs.length} were submitted.`,
+        );
+      }
+
       return outputArray.map((output, i) => {
         if (!output?.signedTransaction) {
           throw new Error(
