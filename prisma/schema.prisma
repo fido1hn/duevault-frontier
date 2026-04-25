@@ -178,6 +178,12 @@ model UmbraInvoicePayment {
   createProofAccountSignature String
   createUtxoSignature         String          @unique
   error                       String?
+  claimableH1Hash             String?
+  claimableH2Hash             String?
+  claimableTreeIndex          String?
+  claimableInsertionIndex     String?
+  claimedAt                   DateTime?
+  claimResult                 Json?
   confirmedAt                 DateTime?
   createdAt                   DateTime        @default(now())
   updatedAt                   DateTime        @updatedAt

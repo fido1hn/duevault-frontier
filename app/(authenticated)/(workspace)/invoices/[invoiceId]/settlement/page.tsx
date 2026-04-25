@@ -19,7 +19,11 @@ import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { createPrivyUmbraSigner } from "@/features/checkout/privy-umbra-signer";
-import { useInvoiceQuery } from "@/features/invoices/queries";
+import {
+  useClaimUmbraInvoicePaymentMutation,
+  useInvoiceQuery,
+} from "@/features/invoices/queries";
+import { summarizeCompletedClaimResult } from "@/features/merchant-profiles/umbra-settlement-claim";
 import { getPaymentMintConfig } from "@/features/payments/mints";
 import { usePrivyUmbraSigner } from "@/hooks/use-privy-umbra-signer";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
@@ -36,21 +40,33 @@ export default function SettlementPage() {
   const { wallet: merchantWallet, signTransaction, signMessage } =
     usePrivyUmbraSigner(profile.walletAddress);
   const invoiceQuery = useInvoiceQuery(params.invoiceId);
+  const claimUmbraPayment = useClaimUmbraInvoicePaymentMutation(params.invoiceId);
   const invoice = invoiceQuery.data ?? null;
   const latestUmbraPayment = invoice?.latestUmbraPayment ?? null;
   const mint = invoice ? getPaymentMintConfig(invoice.mint) : null;
   const isConfirmed = latestUmbraPayment?.status === "confirmed";
   const isSubmitted = latestUmbraPayment?.status === "submitted";
+  const isClaimed = invoice?.status === "Claimed" || invoice?.status === "Settled";
   const error = invoiceQuery.isError
     ? invoiceQuery.error instanceof Error
       ? invoiceQuery.error.message
       : "Unable to load settlement details."
-    : "";
+      : "";
   const [isClaiming, setIsClaiming] = useState(false);
   const [claimError, setClaimError] = useState("");
-  const [claimed, setClaimed] = useState(false);
 
   async function handleClaimSettlement() {
+    if (!invoice || !latestUmbraPayment) {
+      const msg = "Load a confirmed Umbra payment before claiming settlement.";
+      setClaimError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (isClaimed) {
+      return;
+    }
+
     if (!merchantWallet) {
       const msg = "Connect the Solana wallet attached to this merchant profile.";
       setClaimError(msg);
@@ -69,12 +85,32 @@ export default function SettlementPage() {
         signMessage,
         network: runtimeConfig.network,
       });
-      await claimIncomingPayments({
-        ...runtimeConfig,
-        signer,
-        preferPollingTransactionForwarder: true,
+      const claimResult = summarizeCompletedClaimResult(
+        await claimIncomingPayments(
+          {
+            ...runtimeConfig,
+            signer,
+            preferPollingTransactionForwarder: true,
+          },
+          {
+            expected: {
+              destinationAddress: latestUmbraPayment.merchantUmbraWalletAddress,
+              payerWalletAddress: latestUmbraPayment.payerWalletAddress,
+              mint: latestUmbraPayment.mint,
+              amountAtomic: latestUmbraPayment.amountAtomic,
+              h1Hash: latestUmbraPayment.claimableH1Hash,
+              h2Hash: latestUmbraPayment.claimableH2Hash,
+              treeIndex: latestUmbraPayment.claimableTreeIndex,
+              insertionIndex: latestUmbraPayment.claimableInsertionIndex,
+            },
+          },
+        ),
+      );
+
+      await claimUmbraPayment.mutateAsync({
+        createUtxoSignature: latestUmbraPayment.createUtxoSignature,
+        claimResult,
       });
-      setClaimed(true);
       toast.success("Settlement claimed successfully.");
     } catch (err) {
       const message =
@@ -195,7 +231,7 @@ export default function SettlementPage() {
                   </div>
                 </div>
 
-                {isConfirmed && (
+                {(isConfirmed || isClaimed) && (
                   <div className="flex flex-col gap-4">
                     <div className="flex items-start gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4">
                       <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" />
@@ -210,7 +246,7 @@ export default function SettlementPage() {
                       </div>
                     </div>
 
-                    {claimed && (
+                    {isClaimed && (
                       <div className="flex items-start gap-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 p-4">
                         <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" />
                         <div>
@@ -232,13 +268,18 @@ export default function SettlementPage() {
                       size="lg"
                       className="h-14 w-full text-base"
                       onClick={handleClaimSettlement}
-                      disabled={!standardWallets.ready || isClaiming || claimed}
+                      disabled={
+                        !standardWallets.ready ||
+                        isClaiming ||
+                        claimUmbraPayment.isPending ||
+                        isClaimed
+                      }
                     >
-                      {isClaiming ? (
+                      {isClaiming || claimUmbraPayment.isPending ? (
                         <>
                           <Loader2 className="size-4 animate-spin" /> Claiming Settlement…
                         </>
-                      ) : claimed ? (
+                      ) : isClaimed ? (
                         <>
                           <CheckCircle2 className="size-4" /> Settlement Claimed
                         </>

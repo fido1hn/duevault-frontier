@@ -248,6 +248,10 @@ export async function POST(
         data: {
           status: "confirmed",
           confirmedAt,
+          claimableH1Hash: payload.h1Hash,
+          claimableH2Hash: payload.h2Hash,
+          claimableTreeIndex: payload.treeIndex,
+          claimableInsertionIndex: payload.insertionIndex,
         },
       });
 

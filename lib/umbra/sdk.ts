@@ -37,6 +37,10 @@ import {
 } from "@umbra-privacy/web-zk-prover";
 import { address } from "@solana/kit";
 
+import {
+  selectClaimableSettlementUtxos,
+  type SettlementClaimEvidence,
+} from "@/features/merchant-profiles/umbra-settlement-claim";
 import { getProxiedUmbraZkAssetProvider } from "@/lib/umbra/zk-assets";
 import { DEFAULT_INDEXER_ENDPOINT } from "@/lib/umbra/config";
 
@@ -239,12 +243,18 @@ export async function createPrivatePayment(
   );
 }
 
-export async function claimIncomingPayments(config: DueVaultConfig) {
+export async function claimIncomingPayments(
+  config: DueVaultConfig,
+  options: { expected?: SettlementClaimEvidence } = {},
+) {
   const client = await createDueVaultClient(config);
   const fetchClaimable = getClaimableUtxoScannerFunction({ client });
-  const { received } = await fetchClaimable(toU32(0n), toU32(0n));
+  const scanned = await fetchClaimable(toU32(0n), toU32(0n));
+  const claimableUtxos = options.expected
+    ? selectClaimableSettlementUtxos(scanned, options.expected)
+    : [...(scanned.received ?? []), ...(scanned.publicReceived ?? [])];
 
-  if (received.length === 0) {
+  if (claimableUtxos.length === 0) {
     return null;
   }
 
@@ -261,7 +271,7 @@ export async function claimIncomingPayments(config: DueVaultConfig) {
     { zkProver, relayer, fetchBatchMerkleProof },
   );
 
-  return claim(received);
+  return claim(claimableUtxos);
 }
 
 export async function issueAuditorGrant(

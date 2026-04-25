@@ -1,4 +1,5 @@
 import type {
+  ClaimUmbraInvoicePaymentInput,
   ConfirmUmbraInvoicePaymentInput,
   CreateInvoiceInput,
   SerializedInvoice,
@@ -116,6 +117,35 @@ export async function confirmUmbraInvoicePaymentClient(
     throw createApiClientError(
       response,
       "Unable to confirm Umbra payment.",
+      payload.error,
+    );
+  }
+
+  return payload.invoice;
+}
+
+export async function claimUmbraInvoicePaymentClient(
+  invoiceId: string,
+  input: ClaimUmbraInvoicePaymentInput,
+  getAuthToken: GetAuthToken,
+) {
+  const response = await authenticatedFetch(
+    `/api/invoices/${encodeURIComponent(invoiceId)}/umbra-payment/claim`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    getAuthToken,
+  );
+  const payload = (await response.json()) as InvoiceResponse;
+
+  if (!response.ok || !payload.invoice) {
+    throw createApiClientError(
+      response,
+      "Unable to claim Umbra payment.",
       payload.error,
     );
   }

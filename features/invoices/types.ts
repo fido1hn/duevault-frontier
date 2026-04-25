@@ -42,6 +42,12 @@ export type SerializedUmbraInvoicePayment = {
   createProofAccountSignature: string;
   createUtxoSignature: string;
   error: string | null;
+  claimableH1Hash: string | null;
+  claimableH2Hash: string | null;
+  claimableTreeIndex: string | null;
+  claimableInsertionIndex: string | null;
+  claimedAt: string | null;
+  claimResult: unknown | null;
   confirmedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -115,6 +121,11 @@ export type ConfirmUmbraInvoicePaymentInput = {
   h2Hash: string;
   treeIndex: string;
   insertionIndex: string;
+};
+
+export type ClaimUmbraInvoicePaymentInput = {
+  createUtxoSignature: string;
+  claimResult: unknown;
 };
 
 export type InvoiceLineItemCreateData = {

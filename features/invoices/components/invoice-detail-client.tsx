@@ -25,8 +25,10 @@ import {
   useConfirmUmbraInvoicePaymentMutation,
   useInvoiceQuery,
 } from "@/features/invoices/queries";
+import { getInvoiceUmbraSettlementView } from "@/features/invoices/settlement-view";
 import { findMerchantClaimableUmbraPayment } from "@/features/merchant-profiles/umbra-claim-confirmation";
 import { getPaymentMintConfig } from "@/features/payments/mints";
+import { cn } from "@/lib/utils";
 
 type InvoiceDetailClientProps = {
   invoiceId: string;
@@ -61,7 +63,16 @@ export function InvoiceDetailClient({
   const [confirmationError, setConfirmationError] = useState("");
   const latestUmbraPayment = invoice?.latestUmbraPayment ?? null;
   const isUmbraPaymentSubmitted = latestUmbraPayment?.status === "submitted";
-  const isUmbraPaymentConfirmed = latestUmbraPayment?.status === "confirmed";
+  const umbraSettlementView = getInvoiceUmbraSettlementView(
+    invoice?.status ?? "Draft",
+    latestUmbraPayment?.status ?? null,
+  );
+  const UmbraSettlementIcon =
+    umbraSettlementView.tone === "settled"
+      ? CheckCircle2
+      : umbraSettlementView.tone === "waiting"
+        ? Clock
+        : ShieldCheck;
 
   function handleCopyLink() {
     if (!invoice) return;
@@ -314,26 +325,39 @@ export function InvoiceDetailClient({
                 </CardContent>
               </Card>
 
-              <Card className="border-[var(--status-pending)]/20 bg-[var(--status-pending-bg)]/30 shadow-sm">
+              <Card
+                className={cn(
+                  "shadow-sm",
+                  umbraSettlementView.tone === "settled"
+                    ? "border-[var(--status-claimed)]/20 bg-[var(--status-claimed-bg)]/30"
+                    : "border-[var(--status-pending)]/20 bg-[var(--status-pending-bg)]/30",
+                )}
+              >
                 <CardContent className="p-6">
                   <div className="flex items-start gap-3">
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--status-pending)]/10 text-[var(--status-pending)]">
-                      <ShieldCheck className="size-4" />
+                    <div
+                      className={cn(
+                        "flex size-8 shrink-0 items-center justify-center rounded-full",
+                        umbraSettlementView.tone === "settled"
+                          ? "bg-[var(--status-claimed)]/10 text-[var(--status-claimed)]"
+                          : "bg-[var(--status-pending)]/10 text-[var(--status-pending)]",
+                      )}
+                    >
+                      <UmbraSettlementIcon className="size-4" />
                     </div>
                     <div>
-                      <h3 className="font-medium text-[var(--status-pending)]">
-                        {isUmbraPaymentConfirmed
-                          ? "Umbra Payment Confirmed"
-                          : isUmbraPaymentSubmitted
-                            ? "Umbra Payment Submitted"
-                          : "Awaiting Umbra Payment"}
+                      <h3
+                        className={cn(
+                          "font-medium",
+                          umbraSettlementView.tone === "settled"
+                            ? "text-[var(--status-claimed)]"
+                            : "text-[var(--status-pending)]",
+                        )}
+                      >
+                        {umbraSettlementView.title}
                       </h3>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        {isUmbraPaymentConfirmed
-                          ? "The merchant wallet confirmed this claimable UTXO. You can continue to settlement."
-                          : isUmbraPaymentSubmitted
-                            ? "A customer payment transaction was submitted. Confirm the merchant wallet can claim the matching UTXO before detection."
-                          : "Customer payment detection now records confirmed Umbra checkout signatures. Merchant claiming stays in the settlement slice."}
+                        {umbraSettlementView.description}
                       </p>
                       {latestUmbraPayment && (
                         <p className="mt-3 font-mono text-xs text-muted-foreground">
@@ -347,7 +371,7 @@ export function InvoiceDetailClient({
                           {confirmationError}
                         </p>
                       )}
-                      {isUmbraPaymentSubmitted ? (
+                      {umbraSettlementView.action === "confirm" ? (
                         <Button
                           type="button"
                           size="sm"
@@ -364,7 +388,7 @@ export function InvoiceDetailClient({
                           )}
                           Confirm Claimable Payment
                         </Button>
-                      ) : (
+                      ) : umbraSettlementView.action === "review_claim" ? (
                         <Button
                           asChild
                           size="sm"
@@ -373,6 +397,26 @@ export function InvoiceDetailClient({
                           <Link href={`/invoices/${invoice.id}/settlement`}>
                             Review & Claim
                           </Link>
+                        </Button>
+                      ) : umbraSettlementView.action === "claimed" ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled
+                          className="mt-4 w-full border-[var(--status-claimed)]/30 bg-[var(--status-claimed-bg)] text-[var(--status-claimed)]"
+                        >
+                          <CheckCircle2 className="size-4" />
+                          Settlement Claimed
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled
+                          className="mt-4 w-full"
+                        >
+                          <Clock className="size-4" />
+                          Awaiting Payment
                         </Button>
                       )}
                     </div>
