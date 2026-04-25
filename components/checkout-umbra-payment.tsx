@@ -33,6 +33,7 @@ import {
   type CustomerUmbraPaymentResult,
   type CustomerUmbraPaymentStepId,
 } from "@/features/checkout/umbra-payment";
+import { PAYMENT_STEPS } from "@/features/checkout/payment-steps";
 import type { CheckoutUmbraPaymentViewModel } from "@/features/checkout/service";
 import type {
   InvoiceStatus,
@@ -60,24 +61,6 @@ type SaveUmbraPaymentResponse = {
   error?: string;
 };
 
-const PAYMENT_STEPS: {
-  id: CustomerUmbraPaymentStepId;
-  label: string;
-}[] = [
-  { id: "wallet", label: "Wallet" },
-  { id: "checking", label: "Merchant check" },
-  { id: "preflight", label: "Balance check" },
-  { id: "customer_account", label: "Customer account" },
-  { id: "customer_encryption", label: "Encryption key" },
-  { id: "customer_anonymous", label: "Anonymous key" },
-  { id: "customer_verifying", label: "Customer ready" },
-  { id: "payment_preflight", label: "Payment balance" },
-  { id: "master_seed", label: "Umbra signature" },
-  { id: "proof_generation", label: "Proof account" },
-  { id: "create_utxo", label: "Private payment" },
-  { id: "saving", label: "Save result" },
-  { id: "complete", label: "Complete" },
-];
 
 function truncateAddress(value: string) {
   return `${value.slice(0, 6)}...${value.slice(-6)}`;
@@ -317,13 +300,10 @@ function CheckoutUmbraPaymentInner({
         merchantUmbraWalletAddress,
         mintAddress,
         amountAtomic: umbra.amountAtomic,
-        mintDisplayName: umbra.mintDisplayName,
-        mintDecimals: umbra.mintDecimals,
         optionalData: umbra.optionalData,
         onStep: setCurrentStep,
       });
 
-      setCurrentStep("saving");
       const saved = await saveUmbraPayment(umbra.publicId, paymentResult);
       setSavedPayment({
         id: "",
@@ -368,7 +348,7 @@ function CheckoutUmbraPaymentInner({
     }
 
     if (isPaymentRunning) {
-      return currentStep?.startsWith("customer")
+      return currentStep === "customer_registration"
         ? "Setting up Umbra"
         : "Submitting payment";
     }
@@ -514,9 +494,21 @@ function CheckoutUmbraPaymentInner({
                     <Circle className="size-4 text-slate-300" />
                   )}
                 </div>
-                <p className="text-xs font-medium leading-snug text-slate-700">
-                  {step.label}
-                </p>
+                <div>
+                  <p className="text-xs font-medium leading-snug text-slate-700">
+                    {step.label}
+                  </p>
+                  {isActive && step.id === "customer_registration" && (
+                    <p className="mt-0.5 text-xs leading-snug text-slate-500">
+                      First-time setup — approve in wallet
+                    </p>
+                  )}
+                  {isActive && step.id === "preparing_payment" && (
+                    <p className="mt-0.5 text-xs leading-snug text-slate-500">
+                      Generating zero-knowledge proof…
+                    </p>
+                  )}
+                </div>
               </div>
             );
           })}

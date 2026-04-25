@@ -45,8 +45,6 @@ type RunCustomerUmbraPaymentInput = {
   signMessage: UseSignMessage["signMessage"];
   merchantUmbraWalletAddress: string;
   mintAddress: string;
-  mintDisplayName: string;
-  mintDecimals: number;
   amountAtomic: string;
   optionalData: string;
   onStep?: (step: CustomerUmbraPaymentStepId) => void;
@@ -247,8 +245,6 @@ export async function runCustomerUmbraPayment({
   amountAtomic,
   merchantUmbraWalletAddress,
   mintAddress,
-  mintDecimals,
-  mintDisplayName,
   optionalData,
   onStep,
   signMessage,
