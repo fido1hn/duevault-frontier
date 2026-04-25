@@ -8,6 +8,7 @@ export type UmbraRuntimeConfig = {
   network: UmbraNetwork;
   rpcUrl: string;
   rpcSubscriptionsUrl: string;
+  indexerApiEndpoint: string;
 };
 
 export type UmbraAppConfig = UmbraRuntimeConfig & {
@@ -18,6 +19,14 @@ export const UMBRA_APP_NETWORK = "mainnet" as const;
 export const UMBRA_APP_CHECKOUT_MINT_ID = "USDC" as const;
 const DEFAULT_UMBRA_RPC_URL = "https://api.mainnet-beta.solana.com";
 const DEFAULT_UMBRA_RPC_SUBSCRIPTIONS_URL = "wss://api.mainnet-beta.solana.com";
+const DEFAULT_INDEXER_ENDPOINT = "https://indexer.api.umbraprivacy.com";
+
+function getIndexerEndpoint(): string {
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}/api/umbra/indexer`;
+  }
+  return DEFAULT_INDEXER_ENDPOINT;
+}
 
 function isProductionRuntime() {
   return process.env.NODE_ENV === "production";
@@ -107,6 +116,7 @@ export function getUmbraRuntimeConfig(): UmbraRuntimeConfig {
       "NEXT_PUBLIC_UMBRA_RPC_SUBSCRIPTIONS_URL",
       DEFAULT_UMBRA_RPC_SUBSCRIPTIONS_URL,
     ),
+    indexerApiEndpoint: getIndexerEndpoint(),
   };
 }
 
