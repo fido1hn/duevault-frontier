@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useStandardWallets } from "@privy-io/react-auth/solana";
+import { usePrivyUmbraSigner } from "@/hooks/use-privy-umbra-signer";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -41,6 +42,11 @@ export default function SettingsPage() {
 function SettingsContent() {
   const { profile } = useMerchantProfile();
   const standardWallets = useStandardWallets();
+  const {
+    wallet: merchantWallet,
+    signTransaction,
+    signMessage,
+  } = usePrivyUmbraSigner(profile.walletAddress);
   const saveUmbraRegistration = useSaveUmbraRegistrationMutation();
   const runtimeNetwork = useMemo(() => getUmbraRuntimeNetwork(), []);
   const [registrationStep, setRegistrationStep] =
@@ -62,10 +68,17 @@ function SettingsContent() {
   async function handleUmbraSetup() {
     setRegistrationError("");
 
+    if (!merchantWallet) {
+      setRegistrationStep("error");
+      setRegistrationError("Connect the Solana wallet attached to this merchant profile.");
+      return;
+    }
+
     try {
       const result = await runMerchantUmbraRegistration({
-        walletAddress: profile.walletAddress,
-        standardWallets: standardWallets.wallets,
+        wallet: merchantWallet,
+        signTransaction,
+        signMessage,
         onStep: setRegistrationStep,
       });
 
