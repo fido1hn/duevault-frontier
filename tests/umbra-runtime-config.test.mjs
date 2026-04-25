@@ -46,6 +46,7 @@ describe("Umbra runtime config", () => {
       network: "mainnet",
       rpcUrl: "https://api.mainnet-beta.solana.com",
       rpcSubscriptionsUrl: "wss://api.mainnet-beta.solana.com",
+      indexerApiEndpoint: "https://utxo-indexer.api.umbraprivacy.com",
     });
     expect(getUmbraCheckoutMint()).toMatchObject({
       id: "USDC",
@@ -113,6 +114,7 @@ describe("Umbra runtime config", () => {
       network: "mainnet",
       rpcUrl: "https://mainnet.example",
       rpcSubscriptionsUrl: "wss://mainnet.example",
+      indexerApiEndpoint: "https://utxo-indexer.api.umbraprivacy.com",
     });
     expect(getUmbraAppConfig()).toMatchObject({
       network: "mainnet",

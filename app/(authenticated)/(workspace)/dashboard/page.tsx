@@ -8,6 +8,7 @@ import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MerchantWalletCard } from "@/components/wallet/merchant-wallet-card";
 import { useInvoicesQuery } from "@/features/invoices/queries";
 import type { SerializedInvoice } from "@/features/invoices/types";
 import { getPaymentMintDisplayName } from "@/features/payments/mints";
@@ -148,7 +149,15 @@ function DashboardContent() {
       <motion.section
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4, duration: 0.4 }}
+        transition={{ delay: 0.35, duration: 0.4 }}
+      >
+        <MerchantWalletCard />
+      </motion.section>
+
+      <motion.section
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.45, duration: 0.4 }}
         className="flex flex-col gap-4"
       >
         <div className="flex items-center justify-between">

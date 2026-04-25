@@ -3,6 +3,7 @@ import {
   getClaimableUtxoScannerFunction,
   getComplianceGrantIssuerFunction,
   getComplianceGrantRevokerFunction,
+  getEncryptedBalanceQuerierFunction,
   getEncryptedBalanceToPublicBalanceDirectWithdrawerFunction,
   getMasterViewingKeyX25519KeypairDeriver,
   getPollingTransactionForwarder,
@@ -176,6 +177,15 @@ export async function depositPrivateBalance(
   });
 
   return deposit(client.signer.address, toAddress(mint), toU64(amount));
+}
+
+export async function queryPrivateBalance(config: DueVaultConfig, mint: string) {
+  const client = await createDueVaultClient(config);
+  const queryBalances = getEncryptedBalanceQuerierFunction({ client });
+  const mintAddress = toAddress(mint);
+  const balances = await queryBalances([mintAddress]);
+
+  return balances.get(mintAddress) ?? { state: "non_existent" as const };
 }
 
 export async function withdrawPrivateBalance(
