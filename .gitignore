@@ -1,6 +1,7 @@
 node_modules
 dist
 .next
+*.tsbuildinfo
 generated
 .env
 .env.local
@@ -11,3 +12,5 @@ prisma/dev.db
 prisma/dev.db-journal
 .DS_Store
 codex-session.jsonl
+.superpowers/*
+docs/*
