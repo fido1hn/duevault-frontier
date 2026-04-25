@@ -13,11 +13,11 @@ type ProofPacketRouteProps = {
 };
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: ProofPacketRouteProps,
 ) {
   try {
-    const authContext = await requireMerchantProfile(request);
+    const authContext = await requireMerchantProfile(_request);
     const { invoiceId } = await params;
     const invoice = await getInvoiceByNumber(
       authContext.merchantProfile.id,
@@ -37,12 +37,7 @@ export async function GET(
     }
 
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to generate proof packet.",
-      },
+      { error: "Unable to generate proof packet." },
       { status: 400 },
     );
   }
