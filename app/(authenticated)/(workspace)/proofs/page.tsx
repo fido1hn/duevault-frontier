@@ -1,12 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { FileCheck, LockKeyhole, ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import { usePrivy } from "@privy-io/react-auth";
+import { toast } from "sonner";
+import { Download, FileCheck, Loader2, LockKeyhole, ShieldCheck } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { getInvoiceProofPacketClient } from "@/features/invoices/client";
+import type { ProofPacket } from "@/features/invoices/proof-packet";
 import { useInvoicesQuery } from "@/features/invoices/queries";
 
 export default function ProofsPage() {
@@ -23,6 +28,51 @@ export default function ProofsPage() {
       ? invoicesQuery.error.message
       : "Unable to load proof data."
     : "";
+
+  const { getAccessToken } = usePrivy();
+  const [generating, setGenerating] = useState<Set<string>>(new Set());
+  const [packetErrors, setPacketErrors] = useState<Record<string, string>>({});
+
+  function addGenerating(id: string) {
+    setGenerating((prev) => new Set(prev).add(id));
+  }
+
+  function removeGenerating(id: string) {
+    setGenerating((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  function triggerDownload(packet: ProofPacket, invoiceId: string) {
+    const json = JSON.stringify(packet, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `proof-${invoiceId}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleDownload(invoiceId: string) {
+    addGenerating(invoiceId);
+    setPacketErrors((prev) => ({ ...prev, [invoiceId]: "" }));
+
+    try {
+      const packet = await getInvoiceProofPacketClient(invoiceId, getAccessToken);
+      triggerDownload(packet, invoiceId);
+      toast.success("Proof packet downloaded.");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unable to generate proof packet.";
+      setPacketErrors((prev) => ({ ...prev, [invoiceId]: message }));
+      toast.error(message);
+    } finally {
+      removeGenerating(invoiceId);
+    }
+  }
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8 p-6 md:p-8">
@@ -125,21 +175,44 @@ export default function ProofsPage() {
                 key={invoice.invoiceId}
                 className="flex items-center justify-between gap-4 rounded-lg border border-card-border bg-card p-4"
               >
-                <div>
+                <div className="min-w-0">
                   <p className="flex items-center gap-2 text-sm font-medium">
-                    <FileCheck className="size-4 text-muted-foreground" /> {invoice.id}
+                    <FileCheck className="size-4 shrink-0 text-muted-foreground" />
+                    {invoice.id}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {invoice.client} - {invoice.amount}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="flex shrink-0 flex-col items-end gap-2">
                   <Badge variant="outline" className="bg-background font-mono text-[10px]">
                     Confirmed
                   </Badge>
-                  <p className="mt-2 font-mono text-[10px] text-muted-foreground">
+                  <p className="font-mono text-[10px] text-muted-foreground">
                     {invoice.latestUmbraPayment?.confirmedAt ?? "Pending timestamp"}
                   </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() => void handleDownload(invoice.id)}
+                    disabled={generating.has(invoice.id)}
+                  >
+                    {generating.has(invoice.id) ? (
+                      <>
+                        <Loader2 className="size-3 animate-spin" /> Generating…
+                      </>
+                    ) : (
+                      <>
+                        <Download className="size-3" /> Download Proof
+                      </>
+                    )}
+                  </Button>
+                  {packetErrors[invoice.id] && (
+                    <p className="text-right text-[11px] text-destructive">
+                      {packetErrors[invoice.id]}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}
