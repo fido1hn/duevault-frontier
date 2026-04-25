@@ -1,12 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLogin, usePrivy } from "@privy-io/react-auth";
-import {
-  useSignMessage,
-  useSignTransaction,
-  useWallets,
-} from "@privy-io/react-auth/solana";
+import { usePrivyUmbraSigner } from "@/hooks/use-privy-umbra-signer";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -184,9 +180,6 @@ function CheckoutUmbraPaymentInner({
 }: CheckoutUmbraPaymentProps) {
   const { authenticated, linkWallet, ready } = usePrivy();
   const { login } = useLogin();
-  const solanaWallets = useWallets();
-  const { signMessage } = useSignMessage();
-  const { signTransaction } = useSignTransaction();
   const [currentStep, setCurrentStep] =
     useState<CustomerUmbraPaymentStepId | null>(null);
   const [paymentError, setPaymentError] = useState("");
@@ -195,16 +188,14 @@ function CheckoutUmbraPaymentInner({
   >(null);
   const [savedPayment, setSavedPayment] =
     useState<SerializedUmbraInvoicePayment | null>(null);
+  const {
+    wallets: solanaWallets,
+    walletsReady,
+    wallet: selectedWallet,
+    signTransaction,
+    signMessage,
+  } = usePrivyUmbraSigner(selectedWalletAddress);
   const effectivePaymentStatus = savedPayment ?? umbra.latestPayment;
-  const selectedWallet = useMemo(
-    () =>
-      selectedWalletAddress
-        ? solanaWallets.wallets.find(
-            (wallet) => wallet.address === selectedWalletAddress,
-          ) ?? null
-        : null,
-    [selectedWalletAddress, solanaWallets.wallets],
-  );
   const customerWalletAddress = selectedWallet?.address ?? null;
   const isPaymentRunning =
     currentStep !== null &&
@@ -219,26 +210,26 @@ function CheckoutUmbraPaymentInner({
     umbra.mintAddress !== null;
 
   useEffect(() => {
-    if (!solanaWallets.ready) {
+    if (!walletsReady) {
       return;
     }
 
-    if (solanaWallets.wallets.length === 0) {
+    if (solanaWallets.length === 0) {
       setSelectedWalletAddress(null);
       return;
     }
 
     if (
       selectedWalletAddress &&
-      solanaWallets.wallets.some(
+      solanaWallets.some(
         (wallet) => wallet.address === selectedWalletAddress,
       )
     ) {
       return;
     }
 
-    setSelectedWalletAddress(solanaWallets.wallets[0].address);
-  }, [selectedWalletAddress, solanaWallets.ready, solanaWallets.wallets]);
+    setSelectedWalletAddress(solanaWallets[0].address);
+  }, [selectedWalletAddress, walletsReady, solanaWallets]);
 
   async function copyValue(label: string, value: string | null | undefined) {
     if (!value) return;
@@ -352,7 +343,7 @@ function CheckoutUmbraPaymentInner({
         : "Submitting payment";
     }
 
-    if (!ready || (authenticated && !solanaWallets.ready)) {
+    if (!ready || (authenticated && !walletsReady)) {
       return "Loading wallet";
     }
 
@@ -393,7 +384,7 @@ function CheckoutUmbraPaymentInner({
             type="button"
             disabled={
               !ready ||
-              (authenticated && !solanaWallets.ready) ||
+              (authenticated && !walletsReady) ||
               isPaymentRunning ||
               hasPaymentInReview ||
               !isReadyToPay
@@ -420,7 +411,7 @@ function CheckoutUmbraPaymentInner({
         <div className="grid gap-2 sm:grid-cols-2">
           <div className="rounded-lg border border-white/70 bg-white p-3">
             <p className="text-xs font-medium text-slate-500">Customer wallet</p>
-            {solanaWallets.wallets.length > 1 ? (
+            {solanaWallets.length > 1 ? (
               <Select
                 value={selectedWalletAddress ?? undefined}
                 disabled={isPaymentRunning}
@@ -430,7 +421,7 @@ function CheckoutUmbraPaymentInner({
                   <SelectValue placeholder="Select wallet" />
                 </SelectTrigger>
                 <SelectContent>
-                  {solanaWallets.wallets.map((wallet) => (
+                  {solanaWallets.map((wallet) => (
                     <SelectItem key={wallet.address} value={wallet.address}>
                       {wallet.standardWallet.name} {truncateAddress(wallet.address)}
                     </SelectItem>
