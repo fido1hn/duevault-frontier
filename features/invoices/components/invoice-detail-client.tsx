@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useStandardWallets } from "@privy-io/react-auth/solana";
 import { toast } from "sonner";
+import { usePrivyUmbraSigner } from "@/hooks/use-privy-umbra-signer";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -40,6 +41,11 @@ export function InvoiceDetailClient({
 }: InvoiceDetailClientProps) {
   const { profile } = useMerchantProfile();
   const standardWallets = useStandardWallets();
+  const {
+    wallet: merchantWallet,
+    signTransaction,
+    signMessage,
+  } = usePrivyUmbraSigner(profile.walletAddress);
   const invoiceQuery = useInvoiceQuery(invoiceId);
   const confirmUmbraPayment =
     useConfirmUmbraInvoicePaymentMutation(invoiceId);
@@ -72,10 +78,16 @@ export function InvoiceDetailClient({
 
     setConfirmationError("");
 
+    if (!merchantWallet) {
+      setConfirmationError("Connect the Solana wallet attached to this merchant profile.");
+      return;
+    }
+
     try {
       const claimableEvidence = await findMerchantClaimableUmbraPayment({
-        walletAddress: profile.walletAddress,
-        standardWallets: standardWallets.wallets,
+        wallet: merchantWallet,
+        signTransaction,
+        signMessage,
         expected: {
           destinationAddress: latestUmbraPayment.merchantUmbraWalletAddress,
           payerWalletAddress: latestUmbraPayment.payerWalletAddress,
