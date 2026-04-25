@@ -3,6 +3,7 @@ import type {
   CreateInvoiceInput,
   SerializedInvoice,
 } from "@/features/invoices/types";
+import type { ProofPacket } from "@/features/invoices/proof-packet";
 import {
   authenticatedFetch,
   createApiClientError,
@@ -115,4 +116,31 @@ export async function confirmUmbraInvoicePaymentClient(
   }
 
   return payload.invoice;
+}
+
+type ProofPacketResponse = {
+  packet?: ProofPacket;
+  error?: string;
+};
+
+export async function getInvoiceProofPacketClient(
+  invoiceId: string,
+  getAuthToken: GetAuthToken,
+) {
+  const response = await authenticatedFetch(
+    `/api/invoices/${encodeURIComponent(invoiceId)}/proof-packet`,
+    { cache: "no-store" },
+    getAuthToken,
+  );
+  const payload = (await response.json()) as ProofPacketResponse;
+
+  if (!response.ok || !payload.packet) {
+    throw createApiClientError(
+      response,
+      "Unable to generate proof packet.",
+      payload.error,
+    );
+  }
+
+  return payload.packet;
 }
