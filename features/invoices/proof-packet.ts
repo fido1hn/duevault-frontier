@@ -1,4 +1,4 @@
-import type { SerializedInvoice } from "@/features/invoices/types";
+import type { InvoiceMint, SerializedInvoice } from "@/features/invoices/types";
 
 export type ProofPacket = {
   version: "1.0";
@@ -9,7 +9,7 @@ export type ProofPacket = {
     clientEmail: string;
     amount: string;
     amountAtomic: string;
-    mint: string;
+    mint: InvoiceMint;
     issued: string;
     due: string;
     notes: string;

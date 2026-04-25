@@ -104,6 +104,15 @@ describe("buildProofPacket", () => {
     ).toThrow("Invoice does not have a confirmed Umbra payment.");
   });
 
+  test("throws when payment status is failed", () => {
+    expect(() =>
+      buildProofPacket(
+        makeInvoice({ latestUmbraPayment: confirmedPayment({ status: "failed" }) }),
+        FIXED_TS,
+      ),
+    ).toThrow("Invoice does not have a confirmed Umbra payment.");
+  });
+
   test("throws when confirmedAt is null on a confirmed payment", () => {
     expect(() =>
       buildProofPacket(
