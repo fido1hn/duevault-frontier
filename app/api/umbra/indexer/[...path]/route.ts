@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-
-const UPSTREAM_INDEXER = "https://indexer.api.umbraprivacy.com";
+import { DEFAULT_INDEXER_ENDPOINT } from "@/lib/umbra/config";
 
 const SAFE_PATH = /^[a-zA-Z0-9._~:@!$&'()*+,;=%-/]+$/;
 
@@ -41,7 +40,7 @@ async function proxyToIndexer(
   if (url.search.length > 2048) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
-  const upstreamUrl = `${UPSTREAM_INDEXER}/${safePath}${url.search}`;
+  const upstreamUrl = `${DEFAULT_INDEXER_ENDPOINT}/${safePath}${url.search}`;
 
   const headers = new Headers();
   for (const name of FORWARDED_REQUEST_HEADERS) {

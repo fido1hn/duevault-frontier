@@ -19,8 +19,9 @@ export const UMBRA_APP_NETWORK = "mainnet" as const;
 export const UMBRA_APP_CHECKOUT_MINT_ID = "USDC" as const;
 const DEFAULT_UMBRA_RPC_URL = "https://api.mainnet-beta.solana.com";
 const DEFAULT_UMBRA_RPC_SUBSCRIPTIONS_URL = "wss://api.mainnet-beta.solana.com";
-const DEFAULT_INDEXER_ENDPOINT = "https://indexer.api.umbraprivacy.com";
+export const DEFAULT_INDEXER_ENDPOINT = "https://indexer.api.umbraprivacy.com";
 
+// Returns the proxy URL in the browser (avoids CORS) and the direct upstream URL on the server.
 function getIndexerEndpoint(): string {
   if (typeof window !== "undefined") {
     return `${window.location.origin}/api/umbra/indexer`;

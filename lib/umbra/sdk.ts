@@ -37,6 +37,7 @@ import {
 import { address } from "@solana/kit";
 
 import { getProxiedUmbraZkAssetProvider } from "@/lib/umbra/zk-assets";
+import { DEFAULT_INDEXER_ENDPOINT } from "@/lib/umbra/config";
 
 export type DueVaultNetwork = "mainnet" | "devnet";
 
@@ -69,7 +70,6 @@ type ComplianceGrantRequest = {
   auditorAddress: string;
 };
 
-const DEFAULT_INDEXER_ENDPOINT = "https://indexer.api.umbraprivacy.com";
 const DEFAULT_RELAYER_ENDPOINT = "https://relayer.api.umbraprivacy.com";
 
 function toAddress(value: string) {
