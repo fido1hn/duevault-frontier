@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useStandardWallets } from "@privy-io/react-auth/solana";
 import { usePrivyUmbraSigner } from "@/hooks/use-privy-umbra-signer";
 import {
@@ -28,12 +28,18 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getUmbraRuntimeNetwork } from "@/lib/umbra/config";
+import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import { useSaveUmbraRegistrationMutation } from "@/features/merchant-profiles/queries";
 import {
   runMerchantUmbraRegistration,
   type MerchantUmbraRegistrationStepId,
 } from "@/features/merchant-profiles/umbra-registration";
 import type { UmbraRegistrationStatus } from "@/features/merchant-profiles/types";
+import {
+  fetchWalletSolBalance,
+  formatSolLamports,
+  UMBRA_COST_ESTIMATE_LAMPORTS,
+} from "@/features/umbra/costs";
 
 export default function SettingsPage() {
   return <SettingsContent />;
@@ -49,9 +55,16 @@ function SettingsContent() {
   } = usePrivyUmbraSigner(profile.walletAddress);
   const saveUmbraRegistration = useSaveUmbraRegistrationMutation();
   const runtimeNetwork = useMemo(() => getUmbraRuntimeNetwork(), []);
+  const runtimeConfig = useMemo(() => getUmbraRuntimeConfig(), []);
   const [registrationStep, setRegistrationStep] =
     useState<MerchantUmbraRegistrationStepId | null>(null);
   const [registrationError, setRegistrationError] = useState("");
+  const [merchantSolBalance, setMerchantSolBalance] = useState<bigint | null>(
+    null,
+  );
+  const [isMerchantSolBalanceLoading, setIsMerchantSolBalanceLoading] =
+    useState(false);
+  const [merchantSolBalanceError, setMerchantSolBalanceError] = useState("");
   const isUmbraRegistrationRunning =
     registrationStep !== null &&
     registrationStep !== "complete" &&
@@ -64,12 +77,77 @@ function SettingsContent() {
         : registrationError
           ? "error"
           : profile.umbraStatus;
+  const requiredMerchantRegistrationSol =
+    UMBRA_COST_ESTIMATE_LAMPORTS.merchantRegistration;
+  const hasEnoughMerchantSetupSol =
+    merchantSolBalance !== null &&
+    merchantSolBalance >= requiredMerchantRegistrationSol;
+  const blocksMerchantSetupForSol =
+    profile.umbraStatus !== "ready" &&
+    merchantSolBalance !== null &&
+    !hasEnoughMerchantSetupSol;
+
+  useEffect(() => {
+    const walletAddress = profile.umbraWalletAddress ?? profile.walletAddress;
+
+    if (!walletAddress || !standardWallets.ready) {
+      setMerchantSolBalance(null);
+      setMerchantSolBalanceError("");
+      setIsMerchantSolBalanceLoading(false);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsMerchantSolBalanceLoading(true);
+    setMerchantSolBalanceError("");
+
+    fetchWalletSolBalance({
+      rpcUrl: runtimeConfig.rpcUrl,
+      walletAddress,
+    })
+      .then((balance) => {
+        if (!isCurrent) return;
+        setMerchantSolBalance(balance);
+      })
+      .catch((error) => {
+        if (!isCurrent) return;
+        setMerchantSolBalance(null);
+        setMerchantSolBalanceError(
+          error instanceof Error
+            ? error.message
+            : "Unable to load merchant SOL balance.",
+        );
+      })
+      .finally(() => {
+        if (!isCurrent) return;
+        setIsMerchantSolBalanceLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [
+    profile.umbraWalletAddress,
+    profile.walletAddress,
+    runtimeConfig.rpcUrl,
+    standardWallets.ready,
+  ]);
 
   async function handleUmbraSetup() {
     setRegistrationError("");
 
     if (!merchantWallet) {
       const msg = "Connect the Solana wallet attached to this merchant profile.";
+      setRegistrationStep("error");
+      setRegistrationError(msg);
+      toast.error(msg);
+      return;
+    }
+
+    if (blocksMerchantSetupForSol) {
+      const msg = `Add at least ${formatSolLamports(
+        requiredMerchantRegistrationSol,
+      )} to this wallet before Umbra setup.`;
       setRegistrationStep("error");
       setRegistrationError(msg);
       toast.error(msg);
@@ -243,7 +321,8 @@ function SettingsContent() {
                       disabled={
                         !standardWallets.ready ||
                         isUmbraRegistrationRunning ||
-                        saveUmbraRegistration.isPending
+                        saveUmbraRegistration.isPending ||
+                        blocksMerchantSetupForSol
                       }
                     >
                       {isUmbraRegistrationRunning ||
@@ -257,6 +336,58 @@ function SettingsContent() {
                         : `Set up Umbra on ${runtimeNetwork}`}
                     </Button>
                   </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="rounded-lg border border-border bg-background/40 p-4">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Estimated setup cost
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-foreground">
+                        {profile.umbraStatus === "ready"
+                          ? "No setup transaction expected"
+                          : formatSolLamports(requiredMerchantRegistrationSol)}
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        Covers Umbra account opening, encryption key registration,
+                        anonymous commitment, and transaction fees.
+                      </p>
+                    </div>
+                    <div className="rounded-lg border border-border bg-background/40 p-4">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        Merchant wallet SOL
+                      </p>
+                      {isMerchantSolBalanceLoading ? (
+                        <p className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="size-3.5 animate-spin" />
+                          Checking balance
+                        </p>
+                      ) : merchantSolBalance !== null ? (
+                        <p className="mt-1 text-sm font-medium text-foreground">
+                          {formatSolLamports(merchantSolBalance)}
+                        </p>
+                      ) : (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Balance unavailable
+                        </p>
+                      )}
+                      {merchantSolBalanceError && (
+                        <p className="mt-1 text-xs leading-relaxed text-amber-700">
+                          {merchantSolBalanceError}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {blocksMerchantSetupForSol && (
+                    <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                      <p>
+                        Add at least{" "}
+                        {formatSolLamports(requiredMerchantRegistrationSol)} to
+                        this wallet before opening the Umbra account.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="flex flex-col gap-2">

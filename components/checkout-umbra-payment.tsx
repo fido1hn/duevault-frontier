@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLogin, usePrivy } from "@privy-io/react-auth";
 import { usePrivyUmbraSigner } from "@/hooks/use-privy-umbra-signer";
 import {
@@ -31,11 +31,19 @@ import {
 } from "@/features/checkout/umbra-payment";
 import { PAYMENT_STEPS } from "@/features/checkout/payment-steps";
 import type { CheckoutUmbraPaymentViewModel } from "@/features/checkout/service";
+import {
+  fetchWalletUmbraBalances,
+  formatAtomicTokenAmount,
+  formatSolLamports,
+  UMBRA_COST_ESTIMATE_LAMPORTS,
+  type UmbraBalanceReadiness,
+} from "@/features/umbra/costs";
 import type {
   InvoiceStatus,
   PublicUmbraPaymentStatus,
   SerializedUmbraInvoicePayment,
 } from "@/features/invoices/types";
+import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 
 type CheckoutUmbraPaymentProps = {
   amountDisplay: string;
@@ -180,9 +188,14 @@ function CheckoutUmbraPaymentInner({
 }: CheckoutUmbraPaymentProps) {
   const { authenticated, linkWallet, ready } = usePrivy();
   const { login } = useLogin();
+  const runtimeConfig = useMemo(() => getUmbraRuntimeConfig(), []);
   const [currentStep, setCurrentStep] =
     useState<CustomerUmbraPaymentStepId | null>(null);
   const [paymentError, setPaymentError] = useState("");
+  const [balanceReadiness, setBalanceReadiness] =
+    useState<UmbraBalanceReadiness | null>(null);
+  const [isBalanceLoading, setIsBalanceLoading] = useState(false);
+  const [balanceError, setBalanceError] = useState("");
   const [selectedWalletAddress, setSelectedWalletAddress] = useState<
     string | null
   >(null);
@@ -208,6 +221,11 @@ function CheckoutUmbraPaymentInner({
     umbra.merchantReady &&
     umbra.merchantWalletAddress !== null &&
     umbra.mintAddress !== null;
+  const requiredSolLamports =
+    UMBRA_COST_ESTIMATE_LAMPORTS.firstTimeCustomerPayment;
+  const blocksPaymentForBalance =
+    balanceReadiness !== null &&
+    (!balanceReadiness.hasEnoughSol || !balanceReadiness.hasEnoughToken);
 
   useEffect(() => {
     if (!walletsReady) {
@@ -230,6 +248,54 @@ function CheckoutUmbraPaymentInner({
 
     setSelectedWalletAddress(solanaWallets[0].address);
   }, [selectedWalletAddress, walletsReady, solanaWallets]);
+
+  useEffect(() => {
+    if (!customerWalletAddress || !umbra.mintAddress || !umbra.amountAtomic) {
+      setBalanceReadiness(null);
+      setBalanceError("");
+      setIsBalanceLoading(false);
+      return;
+    }
+
+    let isCurrent = true;
+    setIsBalanceLoading(true);
+    setBalanceError("");
+
+    fetchWalletUmbraBalances({
+      amountAtomic: umbra.amountAtomic,
+      mintAddress: umbra.mintAddress,
+      requiredSolLamports,
+      rpcUrl: runtimeConfig.rpcUrl,
+      walletAddress: customerWalletAddress,
+    })
+      .then((readiness) => {
+        if (!isCurrent) return;
+        setBalanceReadiness(readiness);
+      })
+      .catch((error) => {
+        if (!isCurrent) return;
+        setBalanceReadiness(null);
+        setBalanceError(
+          error instanceof Error
+            ? error.message
+            : "Unable to load wallet balances.",
+        );
+      })
+      .finally(() => {
+        if (!isCurrent) return;
+        setIsBalanceLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [
+    customerWalletAddress,
+    requiredSolLamports,
+    runtimeConfig.rpcUrl,
+    umbra.amountAtomic,
+    umbra.mintAddress,
+  ]);
 
   async function copyValue(label: string, value: string | null | undefined) {
     if (!value) return;
@@ -269,6 +335,11 @@ function CheckoutUmbraPaymentInner({
 
     if (!isReadyToPay) {
       toast.error("Merchant Umbra checkout is not ready.");
+      return;
+    }
+
+    if (blocksPaymentForBalance) {
+      toast.error("Add the required SOL and invoice funds before paying.");
       return;
     }
 
@@ -393,7 +464,8 @@ function CheckoutUmbraPaymentInner({
               (authenticated && !walletsReady) ||
               isPaymentRunning ||
               hasPaymentInReview ||
-              !isReadyToPay
+              !isReadyToPay ||
+              blocksPaymentForBalance
             }
             onClick={() => void handlePayPrivately()}
           >
@@ -411,6 +483,65 @@ function CheckoutUmbraPaymentInner({
         {!isReadyToPay && (
           <div className="rounded-lg border border-amber-200 bg-white p-3 text-sm text-amber-900">
             Merchant Umbra setup is not ready for this checkout.
+          </div>
+        )}
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          <div className="rounded-lg border border-white/70 bg-white p-3">
+            <p className="text-xs font-medium text-slate-500">You need</p>
+            <p className="mt-1 text-sm font-medium text-slate-900">
+              {amountDisplay}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600">
+              Estimated Umbra setup and network cost:{" "}
+              {formatSolLamports(requiredSolLamports)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-white/70 bg-white p-3">
+            <p className="text-xs font-medium text-slate-500">Your wallet has</p>
+            {isBalanceLoading ? (
+              <p className="mt-2 flex items-center gap-2 text-sm text-slate-600">
+                <Loader2 className="size-3.5 animate-spin" />
+                Checking balances
+              </p>
+            ) : balanceReadiness ? (
+              <div className="mt-1 space-y-1 text-sm text-slate-900">
+                <p>
+                  {formatAtomicTokenAmount(
+                    balanceReadiness.tokenBalanceAtomic,
+                    umbra.mintDecimals,
+                    mint,
+                  )}
+                </p>
+                <p>{formatSolLamports(balanceReadiness.solBalanceLamports)}</p>
+              </div>
+            ) : (
+              <p className="mt-1 text-sm text-slate-600">
+                {customerWalletAddress
+                  ? "Balance unavailable"
+                  : "Connect wallet to check"}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {balanceReadiness && !balanceReadiness.hasEnoughSol && (
+          <div className="rounded-lg border border-amber-200 bg-white p-3 text-sm text-amber-900">
+            Add at least {formatSolLamports(requiredSolLamports)} for Umbra
+            account setup, proof account rent, and transaction fees.
+          </div>
+        )}
+
+        {balanceReadiness && !balanceReadiness.hasEnoughToken && (
+          <div className="rounded-lg border border-amber-200 bg-white p-3 text-sm text-amber-900">
+            Add {amountDisplay} to this wallet before starting the private
+            payment.
+          </div>
+        )}
+
+        {balanceError && (
+          <div className="rounded-lg border border-amber-200 bg-white p-3 text-sm text-amber-900">
+            Balance check unavailable: {balanceError}
           </div>
         )}
 
