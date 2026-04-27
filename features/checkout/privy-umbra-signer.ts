@@ -95,38 +95,16 @@ export function createPrivyUmbraSigner({
     signTransaction: signUmbraTransaction,
     async signTransactions(transactions) {
       if (transactions.length === 0) return [];
-      if (transactions.length === 1) {
-        return [await signUmbraTransaction(transactions[0])];
-      }
-      // Use Privy's variadic overload to present a single approval prompt
-      // for all transactions. Signature:
-      //   signTransaction(...inputs: SignTransactionInput[]): Promise<SignTransactionOutput[]>
-      const inputs = transactions.map((tx) => ({
-        chain,
-        transaction: new Uint8Array(transactionEncoder.encode(tx)),
-        wallet,
-      }));
-      const outputs = await signTransaction(...inputs);
-      const outputArray = Array.isArray(outputs) ? outputs : [outputs];
 
-      if (outputArray.length !== inputs.length) {
-        throw new Error(
-          `Privy returned ${outputArray.length} signed transaction(s) but ${inputs.length} were submitted.`,
-        );
+      const signedTransactions: Awaited<
+        ReturnType<IUmbraSigner["signTransactions"]>
+      > = [];
+
+      for (const transaction of transactions) {
+        signedTransactions.push(await signUmbraTransaction(transaction));
       }
 
-      return outputArray.map((output, i) => {
-        if (!output?.signedTransaction) {
-          throw new Error(
-            `Privy did not return a signed transaction for index ${i}.`,
-          );
-        }
-        const decoded = transactionDecoder.decode(
-          output.signedTransaction,
-        ) as Awaited<ReturnType<IUmbraSigner["signTransaction"]>>;
-        assertWalletSignedTransaction(decoded, wallet.address);
-        return decoded;
-      });
+      return signedTransactions;
     },
     async signMessage(message) {
       const output = getFirstResult(
