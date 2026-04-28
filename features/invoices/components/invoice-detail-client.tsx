@@ -2,18 +2,16 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useStandardWallets } from "@privy-io/react-auth/solana";
 import { toast } from "sonner";
-import { usePrivyUmbraSigner } from "@/hooks/use-privy-umbra-signer";
 import {
   ArrowLeft,
+  ArrowRight,
   CheckCircle2,
   Clock,
   Copy,
   Download,
   ExternalLink,
   Eye,
-  Loader2,
   ShieldCheck,
 } from "lucide-react";
 
@@ -21,12 +19,8 @@ import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  useConfirmUmbraInvoicePaymentMutation,
-  useInvoiceQuery,
-} from "@/features/invoices/queries";
+import { useInvoiceQuery } from "@/features/invoices/queries";
 import { getInvoiceUmbraSettlementView } from "@/features/invoices/settlement-view";
-import { findMerchantClaimableUmbraPayment } from "@/features/merchant-profiles/umbra-claim-confirmation";
 import { getPaymentMintConfig } from "@/features/payments/mints";
 import { cn } from "@/lib/utils";
 
@@ -40,14 +34,7 @@ function truncateSignature(value: string) {
 
 export function InvoiceDetailClient({ invoiceId }: InvoiceDetailClientProps) {
   const { profile } = useMerchantProfile();
-  const standardWallets = useStandardWallets();
-  const {
-    wallet: merchantWallet,
-    signTransaction,
-    signMessage,
-  } = usePrivyUmbraSigner(profile.walletAddress);
   const invoiceQuery = useInvoiceQuery(invoiceId);
-  const confirmUmbraPayment = useConfirmUmbraInvoicePaymentMutation(invoiceId);
   const invoice = invoiceQuery.data ?? null;
   const mint = invoice ? getPaymentMintConfig(invoice.mint) : null;
   const error = invoiceQuery.isError
@@ -57,7 +44,6 @@ export function InvoiceDetailClient({ invoiceId }: InvoiceDetailClientProps) {
     : "";
   const isLoading = invoiceQuery.isPending;
   const [copied, setCopied] = useState(false);
-  const [confirmationError, setConfirmationError] = useState("");
   const latestUmbraPayment = invoice?.latestUmbraPayment ?? null;
   const umbraSettlementView = getInvoiceUmbraSettlementView(
     invoice?.status ?? "Draft",
@@ -78,49 +64,6 @@ export function InvoiceDetailClient({ invoiceId }: InvoiceDetailClientProps) {
     setCopied(true);
     toast.success("Checkout link copied to clipboard");
     window.setTimeout(() => setCopied(false), 2000);
-  }
-
-  async function handleConfirmUmbraPayment() {
-    if (!invoice || !latestUmbraPayment) return;
-
-    setConfirmationError("");
-
-    if (!merchantWallet) {
-      const msg =
-        "Connect the Solana wallet attached to this merchant profile.";
-      setConfirmationError(msg);
-      toast.error(msg);
-      return;
-    }
-
-    try {
-      const claimableEvidence = await findMerchantClaimableUmbraPayment({
-        wallet: merchantWallet,
-        signTransaction,
-        signMessage,
-        expected: {
-          destinationAddress: latestUmbraPayment.merchantUmbraWalletAddress,
-          payerWalletAddress: latestUmbraPayment.payerWalletAddress,
-          mint: latestUmbraPayment.mint,
-          amountAtomic: latestUmbraPayment.amountAtomic,
-        },
-      });
-
-      await confirmUmbraPayment.mutateAsync({
-        createUtxoSignature: latestUmbraPayment.createUtxoSignature,
-        ...claimableEvidence,
-      });
-      toast.success("Umbra payment confirmed.");
-      void invoiceQuery.refetch();
-    } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to confirm Umbra payment.";
-
-      setConfirmationError(message);
-      toast.error(message);
-    }
   }
 
   return (
@@ -380,35 +323,16 @@ export function InvoiceDetailClient({ invoiceId }: InvoiceDetailClientProps) {
                           )}
                         </p>
                       )}
-                      {confirmationError && (
-                        <p className="mt-3 text-xs leading-relaxed text-red-700">
-                          {confirmationError}
-                        </p>
-                      )}
-                      {umbraSettlementView.action === "confirm" ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          disabled={
-                            !standardWallets.ready ||
-                            confirmUmbraPayment.isPending
-                          }
-                          className="mt-4 w-full bg-[var(--status-pending)] text-white hover:bg-[var(--status-pending)]/90"
-                          onClick={() => void handleConfirmUmbraPayment()}>
-                          {confirmUmbraPayment.isPending ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <ShieldCheck className="size-4" />
-                          )}
-                          Confirm Claimable Payment
-                        </Button>
-                      ) : umbraSettlementView.action === "review_claim" ? (
+                      {umbraSettlementView.action ===
+                      "continue_to_settlement" ? (
                         <Button
                           asChild
                           size="sm"
                           className="mt-4 w-full bg-[var(--status-pending)] text-white hover:bg-[var(--status-pending)]/90">
                           <Link href={`/invoices/${invoice.id}/settlement`}>
-                            Review & Claim
+                            <ShieldCheck className="size-4" />
+                            Continue to Settlement
+                            <ArrowRight className="size-4" />
                           </Link>
                         </Button>
                       ) : umbraSettlementView.action === "claimed" ? (

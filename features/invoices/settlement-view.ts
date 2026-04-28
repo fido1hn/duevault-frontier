@@ -6,7 +6,7 @@ import type {
 type UmbraPaymentStatus = SerializedUmbraInvoicePayment["status"] | null;
 
 export type InvoiceUmbraSettlementView = {
-  action: "awaiting_payment" | "claimed" | "confirm" | "review_claim";
+  action: "awaiting_payment" | "claimed" | "continue_to_settlement";
   description: string;
   title: string;
   tone: "pending" | "settled" | "waiting";
@@ -26,22 +26,18 @@ export function getInvoiceUmbraSettlementView(
     };
   }
 
-  if (latestPaymentStatus === "submitted") {
+  if (
+    latestPaymentStatus === "submitted" ||
+    latestPaymentStatus === "confirmed"
+  ) {
     return {
-      action: "confirm",
+      action: "continue_to_settlement",
       description:
-        "A customer payment transaction was submitted. Confirm the merchant wallet can claim the matching UTXO before detection.",
-      title: "Umbra Payment Submitted",
-      tone: "pending",
-    };
-  }
-
-  if (latestPaymentStatus === "confirmed") {
-    return {
-      action: "review_claim",
-      description:
-        "The merchant wallet confirmed this claimable UTXO. You can continue to settlement.",
-      title: "Umbra Payment Confirmed",
+        "A customer payment is ready for the merchant wallet to scan and claim into the private balance.",
+      title:
+        latestPaymentStatus === "confirmed"
+          ? "Umbra Payment Confirmed"
+          : "Umbra Payment Submitted",
       tone: "pending",
     };
   }

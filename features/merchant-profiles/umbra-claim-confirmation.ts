@@ -39,9 +39,10 @@ type FindMerchantClaimableUmbraPaymentInput = {
     mint: string;
     amountAtomic: string;
   };
+  masterSeedStorage?: DueVaultConfig["masterSeedStorage"];
 };
 
-function createClickScopedMasterSeedStorage(): NonNullable<
+export function createClickScopedMasterSeedStorage(): NonNullable<
   DueVaultConfig["masterSeedStorage"]
 > {
   let cachedSeed: MasterSeed | null = null;
@@ -124,6 +125,7 @@ export async function findMerchantClaimableUmbraPayment({
   wallet,
   signTransaction,
   signMessage,
+  masterSeedStorage,
 }: FindMerchantClaimableUmbraPaymentInput) {
   const runtimeConfig = getUmbraRuntimeConfig();
   const signer = createPrivyUmbraSigner({
@@ -135,7 +137,8 @@ export async function findMerchantClaimableUmbraPayment({
   const client = await createDueVaultClient({
     ...runtimeConfig,
     signer,
-    masterSeedStorage: createClickScopedMasterSeedStorage(),
+    masterSeedStorage:
+      masterSeedStorage ?? createClickScopedMasterSeedStorage(),
     deferMasterSeedSignature: true,
     preferPollingTransactionForwarder: true,
   });

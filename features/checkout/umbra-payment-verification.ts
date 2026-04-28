@@ -14,6 +14,8 @@ import {
   getDepositIntoStealthPoolFromPublicBalanceInstructionDataDecoder,
 } from "@umbra-privacy/umbra-codama";
 
+import { withTransientRetry } from "@/lib/umbra/retry";
+
 export type ExpectedUmbraPaymentEvidence = {
   payerWalletAddress: string;
   mint: string;
@@ -454,6 +456,25 @@ export function verifyUmbraProofAccountTransactionResponse(
   }
 }
 
+async function fetchTransactionWithRetry(
+  connection: Connection,
+  signature: string,
+  label: string,
+) {
+  return withTransientRetry(async () => {
+    const tx = await connection.getTransaction(signature, {
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
+    });
+    if (!tx) {
+      throw new Error(
+        `RPC null result for ${label} ${signature.slice(0, 8)}: not yet indexed`,
+      );
+    }
+    return tx;
+  });
+}
+
 export async function verifyUmbraPaymentEvidence({
   connection,
   createProofAccountSignature,
@@ -461,14 +482,12 @@ export async function verifyUmbraPaymentEvidence({
   expected,
 }: VerifyUmbraPaymentEvidenceInput) {
   const [depositTransaction, proofAccountTransaction] = await Promise.all([
-    connection.getTransaction(createUtxoSignature, {
-      commitment: "confirmed",
-      maxSupportedTransactionVersion: 0,
-    }),
-    connection.getTransaction(createProofAccountSignature, {
-      commitment: "confirmed",
-      maxSupportedTransactionVersion: 0,
-    }),
+    fetchTransactionWithRetry(connection, createUtxoSignature, "Create UTXO"),
+    fetchTransactionWithRetry(
+      connection,
+      createProofAccountSignature,
+      "Create proof account",
+    ),
   ]);
 
   const verified = verifyUmbraDepositTransactionResponse(depositTransaction, {
