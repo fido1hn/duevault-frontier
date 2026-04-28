@@ -42,6 +42,7 @@ export function useInvoiceQuery(invoiceId: string) {
     enabled: ready && authenticated && invoiceId.length > 0,
     refetchInterval: (query) => {
       const invoice = query.state.data;
+      console.log(invoice);
       if (!invoice) return 5_000;
       const paymentStatus = invoice.latestUmbraPayment?.status ?? null;
       if (

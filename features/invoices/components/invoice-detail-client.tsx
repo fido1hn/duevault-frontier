@@ -38,9 +38,7 @@ function truncateSignature(value: string) {
   return `${value.slice(0, 8)}...${value.slice(-8)}`;
 }
 
-export function InvoiceDetailClient({
-  invoiceId,
-}: InvoiceDetailClientProps) {
+export function InvoiceDetailClient({ invoiceId }: InvoiceDetailClientProps) {
   const { profile } = useMerchantProfile();
   const standardWallets = useStandardWallets();
   const {
@@ -49,8 +47,7 @@ export function InvoiceDetailClient({
     signMessage,
   } = usePrivyUmbraSigner(profile.walletAddress);
   const invoiceQuery = useInvoiceQuery(invoiceId);
-  const confirmUmbraPayment =
-    useConfirmUmbraInvoicePaymentMutation(invoiceId);
+  const confirmUmbraPayment = useConfirmUmbraInvoicePaymentMutation(invoiceId);
   const invoice = invoiceQuery.data ?? null;
   const mint = invoice ? getPaymentMintConfig(invoice.mint) : null;
   const error = invoiceQuery.isError
@@ -62,7 +59,6 @@ export function InvoiceDetailClient({
   const [copied, setCopied] = useState(false);
   const [confirmationError, setConfirmationError] = useState("");
   const latestUmbraPayment = invoice?.latestUmbraPayment ?? null;
-  const isUmbraPaymentSubmitted = latestUmbraPayment?.status === "submitted";
   const umbraSettlementView = getInvoiceUmbraSettlementView(
     invoice?.status ?? "Draft",
     latestUmbraPayment?.status ?? null,
@@ -90,7 +86,8 @@ export function InvoiceDetailClient({
     setConfirmationError("");
 
     if (!merchantWallet) {
-      const msg = "Connect the Solana wallet attached to this merchant profile.";
+      const msg =
+        "Connect the Solana wallet attached to this merchant profile.";
       setConfirmationError(msg);
       toast.error(msg);
       return;
@@ -128,7 +125,11 @@ export function InvoiceDetailClient({
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-8 p-6 md:p-8">
-      <Button asChild variant="ghost" size="sm" className="w-fit pl-0 text-muted-foreground">
+      <Button
+        asChild
+        variant="ghost"
+        size="sm"
+        className="w-fit pl-0 text-muted-foreground">
         <Link href="/invoices">
           <ArrowLeft className="size-4" /> Back to Invoices
         </Link>
@@ -137,7 +138,9 @@ export function InvoiceDetailClient({
       {isLoading && (
         <Card className="border-card-border shadow-sm">
           <CardContent className="p-8 text-center">
-            <h1 className="font-serif text-2xl font-semibold">Loading invoice</h1>
+            <h1 className="font-serif text-2xl font-semibold">
+              Loading invoice
+            </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               Fetching the latest invoice details.
             </p>
@@ -148,7 +151,9 @@ export function InvoiceDetailClient({
       {!isLoading && error && (
         <Card className="border-card-border shadow-sm">
           <CardContent className="p-8 text-center">
-            <h1 className="font-serif text-2xl font-semibold">Invoice unavailable</h1>
+            <h1 className="font-serif text-2xl font-semibold">
+              Invoice unavailable
+            </h1>
             <p className="mt-2 text-sm text-muted-foreground">{error}</p>
             <Button asChild className="mt-6">
               <Link href="/invoices/new">Create Invoice</Link>
@@ -173,7 +178,10 @@ export function InvoiceDetailClient({
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={handleCopyLink} className="bg-card">
+              <Button
+                variant="outline"
+                onClick={handleCopyLink}
+                className="bg-card">
                 {copied ? (
                   <CheckCircle2 className="size-4 text-[var(--status-paid)]" />
                 ) : (
@@ -230,9 +238,12 @@ export function InvoiceDetailClient({
                           <tr key={item.id}>
                             <td className="py-3">{item.description}</td>
                             <td className="py-3 text-right">{item.quantity}</td>
-                            <td className="py-3 text-right">{item.priceDisplay}</td>
+                            <td className="py-3 text-right">
+                              {item.priceDisplay}
+                            </td>
                             <td className="py-3 text-right font-medium">
-                              {item.totalDisplay} {mint?.displayName ?? invoice.mint}
+                              {item.totalDisplay}{" "}
+                              {mint?.displayName ?? invoice.mint}
                             </td>
                           </tr>
                         ))}
@@ -242,7 +253,9 @@ export function InvoiceDetailClient({
 
                   <div className="flex justify-between gap-8 text-sm text-muted-foreground">
                     <div className="max-w-[220px]">
-                      <p className="mb-1 text-xs tracking-wider uppercase">Notes</p>
+                      <p className="mb-1 text-xs tracking-wider uppercase">
+                        Notes
+                      </p>
                       <p className="italic">
                         {invoice.notes || "No invoice notes provided."}
                       </p>
@@ -284,7 +297,9 @@ export function InvoiceDetailClient({
             <aside className="flex flex-col gap-6">
               <Card className="border-card-border shadow-sm">
                 <CardContent className="p-6">
-                  <h3 className="mb-4 font-serif font-medium">Status Timeline</h3>
+                  <h3 className="mb-4 font-serif font-medium">
+                    Status Timeline
+                  </h3>
                   <div className="relative flex flex-col gap-6 before:absolute before:inset-y-0 before:left-2 before:w-px before:bg-gradient-to-b before:from-border before:via-border before:to-transparent">
                     {[
                       { label: "Viewed", time: "", icon: Eye },
@@ -306,7 +321,9 @@ export function InvoiceDetailClient({
                     ].map((item) => {
                       const Icon = item.icon;
                       return (
-                        <div key={item.label} className="relative flex gap-4 pl-7">
+                        <div
+                          key={item.label}
+                          className="relative flex gap-4 pl-7">
                           <span className="absolute left-0 top-0.5 flex size-4 rounded-full border-2 border-primary bg-background" />
                           <div>
                             <div className="flex items-center gap-1.5 text-sm font-medium">
@@ -331,8 +348,7 @@ export function InvoiceDetailClient({
                   umbraSettlementView.tone === "settled"
                     ? "border-[var(--status-claimed)]/20 bg-[var(--status-claimed-bg)]/30"
                     : "border-[var(--status-pending)]/20 bg-[var(--status-pending-bg)]/30",
-                )}
-              >
+                )}>
                 <CardContent className="p-6">
                   <div className="flex items-start gap-3">
                     <div
@@ -341,8 +357,7 @@ export function InvoiceDetailClient({
                         umbraSettlementView.tone === "settled"
                           ? "bg-[var(--status-claimed)]/10 text-[var(--status-claimed)]"
                           : "bg-[var(--status-pending)]/10 text-[var(--status-pending)]",
-                      )}
-                    >
+                      )}>
                       <UmbraSettlementIcon className="size-4" />
                     </div>
                     <div>
@@ -352,8 +367,7 @@ export function InvoiceDetailClient({
                           umbraSettlementView.tone === "settled"
                             ? "text-[var(--status-claimed)]"
                             : "text-[var(--status-pending)]",
-                        )}
-                      >
+                        )}>
                         {umbraSettlementView.title}
                       </h3>
                       <p className="mt-1 text-sm text-muted-foreground">
@@ -376,11 +390,11 @@ export function InvoiceDetailClient({
                           type="button"
                           size="sm"
                           disabled={
-                            !standardWallets.ready || confirmUmbraPayment.isPending
+                            !standardWallets.ready ||
+                            confirmUmbraPayment.isPending
                           }
                           className="mt-4 w-full bg-[var(--status-pending)] text-white hover:bg-[var(--status-pending)]/90"
-                          onClick={() => void handleConfirmUmbraPayment()}
-                        >
+                          onClick={() => void handleConfirmUmbraPayment()}>
                           {confirmUmbraPayment.isPending ? (
                             <Loader2 className="size-4 animate-spin" />
                           ) : (
@@ -392,8 +406,7 @@ export function InvoiceDetailClient({
                         <Button
                           asChild
                           size="sm"
-                          className="mt-4 w-full bg-[var(--status-pending)] text-white hover:bg-[var(--status-pending)]/90"
-                        >
+                          className="mt-4 w-full bg-[var(--status-pending)] text-white hover:bg-[var(--status-pending)]/90">
                           <Link href={`/invoices/${invoice.id}/settlement`}>
                             Review & Claim
                           </Link>
@@ -403,8 +416,7 @@ export function InvoiceDetailClient({
                           type="button"
                           size="sm"
                           disabled
-                          className="mt-4 w-full border-[var(--status-claimed)]/30 bg-[var(--status-claimed-bg)] text-[var(--status-claimed)]"
-                        >
+                          className="mt-4 w-full border-[var(--status-claimed)]/30 bg-[var(--status-claimed-bg)] text-[var(--status-claimed)]">
                           <CheckCircle2 className="size-4" />
                           Settlement Claimed
                         </Button>
@@ -413,8 +425,7 @@ export function InvoiceDetailClient({
                           type="button"
                           size="sm"
                           disabled
-                          className="mt-4 w-full"
-                        >
+                          className="mt-4 w-full">
                           <Clock className="size-4" />
                           Awaiting Payment
                         </Button>
