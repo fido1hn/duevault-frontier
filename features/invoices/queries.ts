@@ -40,6 +40,19 @@ export function useInvoiceQuery(invoiceId: string) {
     queryKey: queryKeys.invoice(invoiceId),
     queryFn: () => getInvoiceClient(invoiceId, getAccessToken),
     enabled: ready && authenticated && invoiceId.length > 0,
+    refetchInterval: (query) => {
+      const invoice = query.state.data;
+      if (!invoice) return 5_000;
+      const paymentStatus = invoice.latestUmbraPayment?.status ?? null;
+      if (
+        invoice.status === "Claimed" ||
+        invoice.status === "Settled" ||
+        paymentStatus === "confirmed"
+      ) {
+        return false;
+      }
+      return 5_000;
+    },
   });
 }
 
