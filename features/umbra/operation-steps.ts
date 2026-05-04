@@ -38,7 +38,7 @@ export const MERCHANT_CONFIRM_STEPS: OperationStep<MerchantConfirmStepId>[] = [
   { id: "complete", label: "Done" },
 ];
 
-export const MERCHANT_CLAIM_STEPS: OperationStep<MerchantClaimStepId>[] = [
+export const MERCHANT_SCAN_STEPS: OperationStep<MerchantClaimStepId>[] = [
   {
     id: "signing",
     label: "Connect wallet",
@@ -49,6 +49,11 @@ export const MERCHANT_CLAIM_STEPS: OperationStep<MerchantClaimStepId>[] = [
     label: "Scan claimable UTXO",
     hint: "Arcium decrypts your stealth pool — typically the longest step.",
   },
+  { id: "saving", label: "Save evidence" },
+  { id: "complete", label: "Ready to claim" },
+];
+
+export const MERCHANT_CLAIM_STEPS: OperationStep<MerchantClaimStepId>[] = [
   {
     id: "preparing",
     label: "Prepare claim",

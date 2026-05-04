@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useStandardWallets } from "@privy-io/react-auth/solana";
 import { Connection } from "@solana/web3.js";
@@ -21,17 +21,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { createPrivyUmbraSigner } from "@/features/checkout/privy-umbra-signer";
 import {
   useClaimUmbraInvoicePaymentMutation,
+  useConfirmUmbraInvoicePaymentMutation,
   useInvoiceQuery,
 } from "@/features/invoices/queries";
-import {
-  findMerchantClaimableUmbraPayment,
-  type MerchantUmbraClaimabilityEvidence,
-} from "@/features/merchant-profiles/umbra-claim-confirmation";
+import { findMerchantClaimableUmbraPayment } from "@/features/merchant-profiles/umbra-claim-confirmation";
 import { summarizeCompletedClaimResult } from "@/features/merchant-profiles/umbra-settlement-claim";
 import { getPaymentMintConfig } from "@/features/payments/mints";
 import { UmbraOperationProgress } from "@/features/umbra/components/umbra-operation-progress";
 import {
   MERCHANT_CLAIM_STEPS,
+  MERCHANT_SCAN_STEPS,
   UMBRA_LONG_OPERATION_HINT,
   type MerchantClaimStepId,
 } from "@/features/umbra/operation-steps";
@@ -57,6 +56,9 @@ export default function SettlementPage() {
     merchantWallet?.address,
   );
   const invoiceQuery = useInvoiceQuery(params.invoiceId);
+  const confirmUmbraPayment = useConfirmUmbraInvoicePaymentMutation(
+    params.invoiceId,
+  );
   const claimUmbraPayment = useClaimUmbraInvoicePaymentMutation(
     params.invoiceId,
   );
@@ -72,20 +74,13 @@ export default function SettlementPage() {
       ? invoiceQuery.error.message
       : "Unable to load settlement details."
     : "";
-  const [claimStep, setClaimStep] = useState<MerchantClaimStepId | null>(null);
-  const [claimError, setClaimError] = useState("");
+  const [stepId, setStepId] = useState<MerchantClaimStepId | null>(null);
+  const [actionError, setActionError] = useState("");
 
-  const visibleSteps = useMemo(() => {
-    if (isConfirmed) {
-      return MERCHANT_CLAIM_STEPS.filter((step) => step.id !== "scanning");
-    }
-    return MERCHANT_CLAIM_STEPS;
-  }, [isConfirmed]);
+  const visibleSteps = isSubmitted ? MERCHANT_SCAN_STEPS : MERCHANT_CLAIM_STEPS;
 
-  const isClaiming =
-    claimStep !== null &&
-    claimStep !== "complete" &&
-    claimStep !== "error";
+  const isWorking =
+    stepId !== null && stepId !== "complete" && stepId !== "error";
 
   useEffect(() => {
     if (!latestUmbraPayment || isClaimed) return;
@@ -95,114 +90,152 @@ export default function SettlementPage() {
     void connection.getLatestBlockhash().catch(() => {});
   }, [latestUmbraPayment, isClaimed]);
 
-  async function handleClaimSettlement() {
+  function ensureReady() {
     if (!invoice || !latestUmbraPayment) {
-      const msg = "Load a submitted Umbra payment before claiming settlement.";
-      setClaimError(msg);
+      const msg = "Load a submitted Umbra payment first.";
+      setActionError(msg);
       toast.error(msg);
-      return;
-    }
-
-    if (isClaimed) {
-      return;
+      return null;
     }
 
     if (!merchantWallet) {
       const msg =
         "Connect the Solana wallet attached to this merchant profile.";
-      setClaimError(msg);
+      setActionError(msg);
+      toast.error(msg);
+      return null;
+    }
+
+    return { invoice, latestUmbraPayment, merchantWallet };
+  }
+
+  async function handleScan() {
+    if (isClaimed) return;
+    const ready = ensureReady();
+    if (!ready) return;
+
+    setActionError("");
+    setStepId("signing");
+
+    try {
+      setStepId("scanning");
+      const evidence = await findMerchantClaimableUmbraPayment({
+        wallet: ready.merchantWallet,
+        signTransaction,
+        signMessage,
+        masterSeedStorage,
+        expected: {
+          destinationAddress:
+            ready.latestUmbraPayment.merchantUmbraWalletAddress,
+          payerWalletAddress: ready.latestUmbraPayment.payerWalletAddress,
+          mint: ready.latestUmbraPayment.mint,
+          amountAtomic: ready.latestUmbraPayment.amountAtomic,
+        },
+      });
+
+      setStepId("saving");
+      await confirmUmbraPayment.mutateAsync({
+        createUtxoSignature: ready.latestUmbraPayment.createUtxoSignature,
+        destinationAddress: evidence.destinationAddress,
+        payerWalletAddress: evidence.payerWalletAddress,
+        mint: evidence.mint,
+        amountAtomic: evidence.amountAtomic,
+        h1Hash: evidence.h1Hash,
+        h2Hash: evidence.h2Hash,
+        treeIndex: evidence.treeIndex,
+        insertionIndex: evidence.insertionIndex,
+      });
+
+      setStepId("complete");
+      toast.success("Payment confirmed — ready to claim.");
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : "Unable to scan payment.";
+      const message = raw.includes("No merchant-claimable Umbra UTXO")
+        ? "Customer payment hasn't finalized on-chain yet — try again in a minute."
+        : raw;
+      setActionError(message);
+      setStepId(null);
+      toast.error(message);
+    }
+  }
+
+  async function handleClaim() {
+    if (isClaimed) return;
+    const ready = ensureReady();
+    if (!ready) return;
+
+    const {
+      claimableH1Hash,
+      claimableH2Hash,
+      claimableTreeIndex,
+      claimableInsertionIndex,
+    } = ready.latestUmbraPayment;
+
+    if (
+      !claimableH1Hash ||
+      !claimableH2Hash ||
+      !claimableTreeIndex ||
+      !claimableInsertionIndex
+    ) {
+      const msg =
+        "Claimable evidence is missing — scan the payment again before claiming.";
+      setActionError(msg);
       toast.error(msg);
       return;
     }
 
-    setClaimError("");
-    setClaimStep("signing");
+    setActionError("");
+    setStepId("preparing");
 
     try {
       const runtimeConfig = getUmbraRuntimeConfig();
       const signer = createPrivyUmbraSigner({
-        wallet: merchantWallet,
+        wallet: ready.merchantWallet,
         signTransaction,
         signMessage,
         network: runtimeConfig.network,
       });
 
-      let evidence: MerchantUmbraClaimabilityEvidence;
-
-      if (isSubmitted) {
-        setClaimStep("scanning");
-        evidence = await findMerchantClaimableUmbraPayment({
-          wallet: merchantWallet,
-          signTransaction,
-          signMessage,
+      setStepId("submitting");
+      const claimResultRaw = await claimIncomingPayments(
+        {
+          ...runtimeConfig,
+          signer,
           masterSeedStorage,
+          deferMasterSeedSignature: true,
+          preferPollingTransactionForwarder: true,
+        },
+        {
           expected: {
-            destinationAddress: latestUmbraPayment.merchantUmbraWalletAddress,
-            payerWalletAddress: latestUmbraPayment.payerWalletAddress,
-            mint: latestUmbraPayment.mint,
-            amountAtomic: latestUmbraPayment.amountAtomic,
+            destinationAddress:
+              ready.latestUmbraPayment.merchantUmbraWalletAddress,
+            payerWalletAddress: ready.latestUmbraPayment.payerWalletAddress,
+            mint: ready.latestUmbraPayment.mint,
+            amountAtomic: ready.latestUmbraPayment.amountAtomic,
+            h1Hash: claimableH1Hash,
+            h2Hash: claimableH2Hash,
+            treeIndex: claimableTreeIndex,
+            insertionIndex: claimableInsertionIndex,
           },
-        });
-      } else if (
-        latestUmbraPayment.claimableH1Hash &&
-        latestUmbraPayment.claimableH2Hash &&
-        latestUmbraPayment.claimableTreeIndex &&
-        latestUmbraPayment.claimableInsertionIndex
-      ) {
-        evidence = {
-          destinationAddress: latestUmbraPayment.merchantUmbraWalletAddress,
-          payerWalletAddress: latestUmbraPayment.payerWalletAddress,
-          mint: latestUmbraPayment.mint,
-          amountAtomic: latestUmbraPayment.amountAtomic,
-          h1Hash: latestUmbraPayment.claimableH1Hash,
-          h2Hash: latestUmbraPayment.claimableH2Hash,
-          treeIndex: latestUmbraPayment.claimableTreeIndex,
-          insertionIndex: latestUmbraPayment.claimableInsertionIndex,
-        };
-      } else {
-        throw new Error(
-          "Cached claimable evidence is missing — cannot claim without scanning first.",
-        );
-      }
-
-      setClaimStep("preparing");
-      const claimResult = summarizeCompletedClaimResult(
-        await claimIncomingPayments(
-          {
-            ...runtimeConfig,
-            signer,
-            masterSeedStorage,
-            deferMasterSeedSignature: true,
-            preferPollingTransactionForwarder: true,
-          },
-          {
-            expected: {
-              destinationAddress: evidence.destinationAddress,
-              payerWalletAddress: evidence.payerWalletAddress,
-              mint: evidence.mint,
-              amountAtomic: evidence.amountAtomic,
-              h1Hash: evidence.h1Hash,
-              h2Hash: evidence.h2Hash,
-              treeIndex: evidence.treeIndex,
-              insertionIndex: evidence.insertionIndex,
-            },
-          },
-        ),
+        },
       );
 
-      setClaimStep("saving");
+      setStepId("confirming");
+      const claimResult = summarizeCompletedClaimResult(claimResultRaw);
+
+      setStepId("saving");
       await claimUmbraPayment.mutateAsync({
-        createUtxoSignature: latestUmbraPayment.createUtxoSignature,
+        createUtxoSignature: ready.latestUmbraPayment.createUtxoSignature,
         claimResult,
       });
 
-      setClaimStep("complete");
+      setStepId("complete");
       toast.success("Settlement claimed successfully.");
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Unable to claim settlement.";
-      setClaimError(message);
-      setClaimStep("error");
+      setActionError(message);
+      setStepId("error");
       toast.error(message);
     }
   }
@@ -270,9 +303,11 @@ export default function SettlementPage() {
                 <h2 className="font-medium text-foreground">
                   {isClaimed
                     ? "Settlement Claimed"
-                    : latestUmbraPayment
+                    : isConfirmed
                       ? "Ready to Claim"
-                      : "Awaiting Customer Payment"}
+                      : isSubmitted
+                        ? "Ready to Scan"
+                        : "Awaiting Customer Payment"}
                 </h2>
               </div>
               <CardContent className="p-6">
@@ -335,34 +370,56 @@ export default function SettlementPage() {
                       {UMBRA_LONG_OPERATION_HINT}
                     </div>
 
-                    {isClaiming && (
+                    {isWorking && (
                       <UmbraOperationProgress
                         steps={visibleSteps}
-                        currentStep={claimStep}
+                        currentStep={stepId}
                       />
                     )}
 
-                    {claimError && (
-                      <p className="text-sm text-destructive">{claimError}</p>
+                    {actionError && (
+                      <p className="text-sm text-destructive">{actionError}</p>
                     )}
 
-                    <Button
-                      size="lg"
-                      className="h-14 w-full text-base"
-                      onClick={handleClaimSettlement}
-                      disabled={
-                        !standardWallets.ready ||
-                        isClaiming ||
-                        claimUmbraPayment.isPending
-                      }>
-                      {isClaiming ? (
-                        <>Claiming Settlement…</>
-                      ) : (
-                        <>
-                          <ShieldCheck className="size-4" /> Claim Settlement
-                        </>
-                      )}
-                    </Button>
+                    {isSubmitted && (
+                      <Button
+                        size="lg"
+                        className="h-14 w-full text-base"
+                        onClick={handleScan}
+                        disabled={
+                          !standardWallets.ready ||
+                          isWorking ||
+                          confirmUmbraPayment.isPending
+                        }>
+                        {isWorking ? (
+                          <>Scanning…</>
+                        ) : (
+                          <>
+                            <ShieldCheck className="size-4" /> Scan for Payment
+                          </>
+                        )}
+                      </Button>
+                    )}
+
+                    {isConfirmed && (
+                      <Button
+                        size="lg"
+                        className="h-14 w-full text-base"
+                        onClick={handleClaim}
+                        disabled={
+                          !standardWallets.ready ||
+                          isWorking ||
+                          claimUmbraPayment.isPending
+                        }>
+                        {isWorking ? (
+                          <>Claiming Settlement…</>
+                        ) : (
+                          <>
+                            <ShieldCheck className="size-4" /> Claim Settlement
+                          </>
+                        )}
+                      </Button>
+                    )}
                   </div>
                 )}
 
@@ -403,8 +460,12 @@ export default function SettlementPage() {
                     "The customer submits verified Umbra transaction evidence for this invoice.",
                   ],
                   [
-                    "Scan & Claim",
-                    "Your wallet derives a scanning key, finds the matching UTXO, and claims it into your encrypted balance — all in one step.",
+                    "Scan",
+                    "Your wallet derives a scanning key, locates the matching UTXO, and we save its proof to your record.",
+                  ],
+                  [
+                    "Claim",
+                    "Submit the claim transaction to move the payment into your encrypted balance.",
                   ],
                   [
                     "Settled",
