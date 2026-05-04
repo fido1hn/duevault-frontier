@@ -2,6 +2,7 @@ import type {
   ClaimUmbraInvoicePaymentInput,
   ConfirmUmbraInvoicePaymentInput,
   CreateInvoiceInput,
+  RecordUmbraClaimAttemptInput,
   SerializedInvoice,
 } from "@/features/invoices/types";
 import type { ProofPacket } from "@/features/invoices/proof-packet";
@@ -146,6 +147,35 @@ export async function claimUmbraInvoicePaymentClient(
     throw createApiClientError(
       response,
       "Unable to claim Umbra payment.",
+      payload.error,
+    );
+  }
+
+  return payload.invoice;
+}
+
+export async function recordUmbraClaimAttemptClient(
+  invoiceId: string,
+  input: RecordUmbraClaimAttemptInput,
+  getAuthToken: GetAuthToken,
+) {
+  const response = await authenticatedFetch(
+    `/api/invoices/${encodeURIComponent(invoiceId)}/umbra-payment/claim-attempt`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+    getAuthToken,
+  );
+  const payload = (await response.json()) as InvoiceResponse;
+
+  if (!response.ok || !payload.invoice) {
+    throw createApiClientError(
+      response,
+      "Unable to record claim attempt.",
       payload.error,
     );
   }

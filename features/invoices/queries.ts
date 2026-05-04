@@ -9,11 +9,13 @@ import {
   createInvoiceClient,
   getInvoiceClient,
   listInvoicesClient,
+  recordUmbraClaimAttemptClient,
 } from "@/features/invoices/client";
 import type {
   ClaimUmbraInvoicePaymentInput,
   ConfirmUmbraInvoicePaymentInput,
   CreateInvoiceInput,
+  RecordUmbraClaimAttemptInput,
   SerializedInvoice,
 } from "@/features/invoices/types";
 import { queryKeys } from "@/features/query/keys";
@@ -42,14 +44,13 @@ export function useInvoiceQuery(invoiceId: string) {
     enabled: ready && authenticated && invoiceId.length > 0,
     refetchInterval: (query) => {
       const invoice = query.state.data;
-      console.log(invoice);
       if (!invoice) return 5_000;
+      if (invoice.status === "Claimed" || invoice.status === "Settled") {
+        return false;
+      }
       const paymentStatus = invoice.latestUmbraPayment?.status ?? null;
-      if (
-        invoice.status === "Claimed" ||
-        invoice.status === "Settled" ||
-        paymentStatus === "confirmed"
-      ) {
+      const claimStatus = invoice.latestUmbraPayment?.claimStatus ?? null;
+      if (paymentStatus === "confirmed" && claimStatus !== "pending") {
         return false;
       }
       return 5_000;
@@ -92,6 +93,20 @@ export function useClaimUmbraInvoicePaymentMutation(invoiceId: string) {
   return useMutation({
     mutationFn: (input: ClaimUmbraInvoicePaymentInput) =>
       claimUmbraInvoicePaymentClient(invoiceId, input, getAccessToken),
+    onSuccess: (invoice) => {
+      queryClient.setQueryData(queryKeys.invoice(invoice.id), invoice);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.invoices });
+    },
+  });
+}
+
+export function useRecordUmbraClaimAttemptMutation(invoiceId: string) {
+  const { getAccessToken } = usePrivy();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: RecordUmbraClaimAttemptInput) =>
+      recordUmbraClaimAttemptClient(invoiceId, input, getAccessToken),
     onSuccess: (invoice) => {
       queryClient.setQueryData(queryKeys.invoice(invoice.id), invoice);
       void queryClient.invalidateQueries({ queryKey: queryKeys.invoices });

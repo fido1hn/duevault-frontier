@@ -389,6 +389,10 @@ function CheckoutUmbraPaymentInner({
         claimedAt: null,
         claimResult: null,
         confirmedAt: saved.payment.confirmedAt,
+        claimStatus: null,
+        claimAttempts: 0,
+        claimLastError: null,
+        claimLastAttemptedAt: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });

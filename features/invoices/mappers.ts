@@ -59,6 +59,16 @@ function assertUmbraInvoicePaymentStatus(
   }
 }
 
+function normalizeClaimStatus(
+  value: string | null,
+): SerializedUmbraInvoicePayment["claimStatus"] {
+  if (value === null) return null;
+  if (value === "pending" || value === "failed" || value === "confirmed") {
+    return value;
+  }
+  throw new Error("Invalid Umbra invoice claim status.");
+}
+
 export function serializeUmbraInvoicePayment(
   payment: InvoiceRecord["umbraPayments"][number],
 ): SerializedUmbraInvoicePayment {
@@ -87,6 +97,10 @@ export function serializeUmbraInvoicePayment(
     claimedAt: payment.claimedAt?.toISOString() ?? null,
     claimResult: payment.claimResult ?? null,
     confirmedAt: payment.confirmedAt?.toISOString() ?? null,
+    claimStatus: normalizeClaimStatus(payment.claimStatus ?? null),
+    claimAttempts: payment.claimAttempts,
+    claimLastError: payment.claimLastError,
+    claimLastAttemptedAt: payment.claimLastAttemptedAt?.toISOString() ?? null,
     createdAt: payment.createdAt.toISOString(),
     updatedAt: payment.updatedAt.toISOString(),
   };

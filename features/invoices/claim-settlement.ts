@@ -114,3 +114,37 @@ export function assertUmbraClaimPersistenceAllowed({
 
   return { alreadyClaimed: false };
 }
+
+const CLAIM_LAST_ERROR_MAX_LENGTH = 500;
+
+type ClaimAttemptPayload = {
+  createUtxoSignature?: unknown;
+  phase?: unknown;
+  error?: unknown;
+};
+
+export type ParsedUmbraClaimAttemptPayload =
+  | { createUtxoSignature: string; phase: "started" }
+  | { createUtxoSignature: string; phase: "failed"; error: string };
+
+export function parseUmbraClaimAttemptPayload(
+  payload: ClaimAttemptPayload,
+): ParsedUmbraClaimAttemptPayload {
+  const createUtxoSignature = validateSignature(
+    getRequiredString(payload.createUtxoSignature, "Create UTXO signature"),
+    "Create UTXO signature",
+  );
+
+  if (payload.phase !== "started" && payload.phase !== "failed") {
+    fail("Phase must be 'started' or 'failed'.");
+  }
+
+  if (payload.phase === "started") {
+    return { createUtxoSignature, phase: "started" };
+  }
+
+  const rawError = getRequiredString(payload.error, "Error message");
+  const error = rawError.slice(0, CLAIM_LAST_ERROR_MAX_LENGTH);
+
+  return { createUtxoSignature, phase: "failed", error };
+}

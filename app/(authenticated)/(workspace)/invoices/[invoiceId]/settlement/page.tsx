@@ -1,17 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useStandardWallets } from "@privy-io/react-auth/solana";
 import { Connection } from "@solana/web3.js";
 import { toast } from "sonner";
 import {
+  AlertTriangle,
   ArrowLeft,
   CheckCircle2,
   Clock,
   ExternalLink,
   Lock,
+  RefreshCw,
   ShieldCheck,
 } from "lucide-react";
 
@@ -23,8 +25,12 @@ import {
   useClaimUmbraInvoicePaymentMutation,
   useConfirmUmbraInvoicePaymentMutation,
   useInvoiceQuery,
+  useRecordUmbraClaimAttemptMutation,
 } from "@/features/invoices/queries";
-import { findMerchantClaimableUmbraPayment } from "@/features/merchant-profiles/umbra-claim-confirmation";
+import {
+  findMerchantClaimableUmbraPayment,
+  type MerchantUmbraClaimabilityEvidence,
+} from "@/features/merchant-profiles/umbra-claim-confirmation";
 import { summarizeCompletedClaimResult } from "@/features/merchant-profiles/umbra-settlement-claim";
 import { getPaymentMintConfig } from "@/features/payments/mints";
 import { UmbraOperationProgress } from "@/features/umbra/components/umbra-operation-progress";
@@ -37,7 +43,12 @@ import {
 import { usePrivyUmbraSigner } from "@/hooks/use-privy-umbra-signer";
 import { useUmbraMerchantSession } from "@/hooks/use-umbra-merchant-session";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
+import { withTransientRetry } from "@/lib/umbra/retry";
 import { claimIncomingPayments } from "@/lib/umbra/sdk";
+
+const RETRY_ATTEMPTS = 3;
+const ALREADY_CLAIMED_MESSAGE =
+  "This payment may have been claimed in a previous attempt. Refresh the page to verify; if it stays unclaimed, contact support.";
 
 function truncate(value: string) {
   return `${value.slice(0, 8)}...${value.slice(-8)}`;
@@ -62,6 +73,9 @@ export default function SettlementPage() {
   const claimUmbraPayment = useClaimUmbraInvoicePaymentMutation(
     params.invoiceId,
   );
+  const recordClaimAttempt = useRecordUmbraClaimAttemptMutation(
+    params.invoiceId,
+  );
   const invoice = invoiceQuery.data ?? null;
   const latestUmbraPayment = invoice?.latestUmbraPayment ?? null;
   const mint = invoice ? getPaymentMintConfig(invoice.mint) : null;
@@ -69,6 +83,11 @@ export default function SettlementPage() {
   const isConfirmed = latestUmbraPayment?.status === "confirmed";
   const isClaimed =
     invoice?.status === "Claimed" || invoice?.status === "Settled";
+  const claimStatus = latestUmbraPayment?.claimStatus ?? null;
+  const claimAttempts = latestUmbraPayment?.claimAttempts ?? 0;
+  const claimLastError = latestUmbraPayment?.claimLastError ?? null;
+  const isClaimPending = claimStatus === "pending" && !isClaimed;
+  const hasClaimFailure = claimStatus === "failed" && !isClaimed;
   const error = invoiceQuery.isError
     ? invoiceQuery.error instanceof Error
       ? invoiceQuery.error.message
@@ -76,6 +95,11 @@ export default function SettlementPage() {
     : "";
   const [stepId, setStepId] = useState<MerchantClaimStepId | null>(null);
   const [actionError, setActionError] = useState("");
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const evidenceCacheRef = useRef<{
+    createUtxoSignature: string;
+    evidence: MerchantUmbraClaimabilityEvidence;
+  } | null>(null);
 
   const visibleSteps = isSubmitted ? MERCHANT_SCAN_STEPS : MERCHANT_CLAIM_STEPS;
 
@@ -89,6 +113,10 @@ export default function SettlementPage() {
     const connection = new Connection(runtimeConfig.rpcUrl, "confirmed");
     void connection.getLatestBlockhash().catch(() => {});
   }, [latestUmbraPayment, isClaimed]);
+
+  useEffect(() => {
+    evidenceCacheRef.current = null;
+  }, [merchantWallet?.address, latestUmbraPayment?.createUtxoSignature]);
 
   function ensureReady() {
     if (!invoice || !latestUmbraPayment) {
@@ -115,23 +143,48 @@ export default function SettlementPage() {
     if (!ready) return;
 
     setActionError("");
-    setStepId("signing");
+    setRetryAttempt(0);
+
+    const cached =
+      evidenceCacheRef.current?.createUtxoSignature ===
+      ready.latestUmbraPayment.createUtxoSignature
+        ? evidenceCacheRef.current.evidence
+        : null;
 
     try {
-      setStepId("scanning");
-      const evidence = await findMerchantClaimableUmbraPayment({
-        wallet: ready.merchantWallet,
-        signTransaction,
-        signMessage,
-        masterSeedStorage,
-        expected: {
-          destinationAddress:
-            ready.latestUmbraPayment.merchantUmbraWalletAddress,
-          payerWalletAddress: ready.latestUmbraPayment.payerWalletAddress,
-          mint: ready.latestUmbraPayment.mint,
-          amountAtomic: ready.latestUmbraPayment.amountAtomic,
-        },
-      });
+      let evidence: MerchantUmbraClaimabilityEvidence;
+
+      if (cached) {
+        evidence = cached;
+      } else {
+        setStepId("signing");
+        setStepId("scanning");
+        evidence = await withTransientRetry(
+          () =>
+            findMerchantClaimableUmbraPayment({
+              wallet: ready.merchantWallet,
+              signTransaction,
+              signMessage,
+              masterSeedStorage,
+              expected: {
+                destinationAddress:
+                  ready.latestUmbraPayment.merchantUmbraWalletAddress,
+                payerWalletAddress: ready.latestUmbraPayment.payerWalletAddress,
+                mint: ready.latestUmbraPayment.mint,
+                amountAtomic: ready.latestUmbraPayment.amountAtomic,
+              },
+            }),
+          {
+            attempts: RETRY_ATTEMPTS,
+            onRetry: (attempt) => setRetryAttempt(attempt + 1),
+          },
+        );
+        evidenceCacheRef.current = {
+          createUtxoSignature: ready.latestUmbraPayment.createUtxoSignature,
+          evidence,
+        };
+        setRetryAttempt(0);
+      }
 
       setStepId("saving");
       await confirmUmbraPayment.mutateAsync({
@@ -146,7 +199,9 @@ export default function SettlementPage() {
         insertionIndex: evidence.insertionIndex,
       });
 
+      evidenceCacheRef.current = null;
       setStepId("complete");
+      setRetryAttempt(0);
       toast.success("Payment confirmed — ready to claim.");
     } catch (err) {
       const raw = err instanceof Error ? err.message : "Unable to scan payment.";
@@ -155,6 +210,7 @@ export default function SettlementPage() {
         : raw;
       setActionError(message);
       setStepId(null);
+      setRetryAttempt(0);
       toast.error(message);
     }
   }
@@ -185,9 +241,17 @@ export default function SettlementPage() {
     }
 
     setActionError("");
-    setStepId("preparing");
+    setRetryAttempt(0);
+
+    let attemptStarted = false;
 
     try {
+      await recordClaimAttempt.mutateAsync({
+        createUtxoSignature: ready.latestUmbraPayment.createUtxoSignature,
+        phase: "started",
+      });
+      attemptStarted = true;
+
       const runtimeConfig = getUmbraRuntimeConfig();
       const signer = createPrivyUmbraSigner({
         wallet: ready.merchantWallet,
@@ -196,30 +260,39 @@ export default function SettlementPage() {
         network: runtimeConfig.network,
       });
 
+      setStepId("preparing");
       setStepId("submitting");
-      const claimResultRaw = await claimIncomingPayments(
+      const claimResultRaw = await withTransientRetry(
+        () =>
+          claimIncomingPayments(
+            {
+              ...runtimeConfig,
+              signer,
+              masterSeedStorage,
+              deferMasterSeedSignature: true,
+              preferPollingTransactionForwarder: true,
+            },
+            {
+              expected: {
+                destinationAddress:
+                  ready.latestUmbraPayment.merchantUmbraWalletAddress,
+                payerWalletAddress: ready.latestUmbraPayment.payerWalletAddress,
+                mint: ready.latestUmbraPayment.mint,
+                amountAtomic: ready.latestUmbraPayment.amountAtomic,
+                h1Hash: claimableH1Hash,
+                h2Hash: claimableH2Hash,
+                treeIndex: claimableTreeIndex,
+                insertionIndex: claimableInsertionIndex,
+              },
+            },
+          ),
         {
-          ...runtimeConfig,
-          signer,
-          masterSeedStorage,
-          deferMasterSeedSignature: true,
-          preferPollingTransactionForwarder: true,
-        },
-        {
-          expected: {
-            destinationAddress:
-              ready.latestUmbraPayment.merchantUmbraWalletAddress,
-            payerWalletAddress: ready.latestUmbraPayment.payerWalletAddress,
-            mint: ready.latestUmbraPayment.mint,
-            amountAtomic: ready.latestUmbraPayment.amountAtomic,
-            h1Hash: claimableH1Hash,
-            h2Hash: claimableH2Hash,
-            treeIndex: claimableTreeIndex,
-            insertionIndex: claimableInsertionIndex,
-          },
+          attempts: RETRY_ATTEMPTS,
+          onRetry: (attempt) => setRetryAttempt(attempt + 1),
         },
       );
 
+      setRetryAttempt(0);
       setStepId("confirming");
       const claimResult = summarizeCompletedClaimResult(claimResultRaw);
 
@@ -230,12 +303,34 @@ export default function SettlementPage() {
       });
 
       setStepId("complete");
+      setRetryAttempt(0);
       toast.success("Settlement claimed successfully.");
     } catch (err) {
-      const message =
+      const raw =
         err instanceof Error ? err.message : "Unable to claim settlement.";
+      const message = /already claimed/i.test(raw)
+        ? ALREADY_CLAIMED_MESSAGE
+        : raw;
+
+      if (attemptStarted) {
+        try {
+          await recordClaimAttempt.mutateAsync({
+            createUtxoSignature: ready.latestUmbraPayment.createUtxoSignature,
+            phase: "failed",
+            error: message,
+          });
+        } catch (recordErr) {
+          const recordMessage =
+            recordErr instanceof Error
+              ? recordErr.message
+              : "Could not record claim failure.";
+          toast.error(`Could not record claim failure: ${recordMessage}`);
+        }
+      }
+
       setActionError(message);
       setStepId("error");
+      setRetryAttempt(0);
       toast.error(message);
     }
   }
@@ -303,11 +398,15 @@ export default function SettlementPage() {
                 <h2 className="font-medium text-foreground">
                   {isClaimed
                     ? "Settlement Claimed"
-                    : isConfirmed
-                      ? "Ready to Claim"
-                      : isSubmitted
-                        ? "Ready to Scan"
-                        : "Awaiting Customer Payment"}
+                    : hasClaimFailure
+                      ? "Claim Failed"
+                      : isClaimPending
+                        ? "Claim In Progress"
+                        : isConfirmed
+                          ? "Ready to Claim"
+                          : isSubmitted
+                            ? "Ready to Scan"
+                            : "Awaiting Customer Payment"}
                 </h2>
               </div>
               <CardContent className="p-6">
@@ -370,10 +469,44 @@ export default function SettlementPage() {
                       {UMBRA_LONG_OPERATION_HINT}
                     </div>
 
+                    {hasClaimFailure && !isWorking && (
+                      <div className="flex items-start gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs leading-relaxed text-destructive">
+                        <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                        <div>
+                          <p className="font-medium">
+                            Last claim attempt failed
+                            {claimAttempts > 0 ? ` (attempt ${claimAttempts})` : ""}
+                          </p>
+                          {claimLastError && (
+                            <p className="mt-1 wrap-break-word">{claimLastError}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {isClaimPending && !isWorking && (
+                      <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs leading-relaxed text-amber-900 dark:text-amber-200">
+                        <RefreshCw className="mt-0.5 size-4 shrink-0" />
+                        <div>
+                          <p className="font-medium">
+                            Last claim attempt may still be in flight
+                          </p>
+                          <p className="mt-1">
+                            If you closed the tab during a claim, retry to
+                            verify. We&apos;ll record this as a new attempt.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {isWorking && (
                       <UmbraOperationProgress
                         steps={visibleSteps}
                         currentStep={stepId}
+                        retryAttempt={
+                          retryAttempt > 0 ? retryAttempt : undefined
+                        }
+                        retryMax={RETRY_ATTEMPTS}
                       />
                     )}
 
@@ -409,10 +542,15 @@ export default function SettlementPage() {
                         disabled={
                           !standardWallets.ready ||
                           isWorking ||
-                          claimUmbraPayment.isPending
+                          claimUmbraPayment.isPending ||
+                          recordClaimAttempt.isPending
                         }>
                         {isWorking ? (
                           <>Claiming Settlement…</>
+                        ) : hasClaimFailure || isClaimPending ? (
+                          <>
+                            <RefreshCw className="size-4" /> Retry Claim
+                          </>
                         ) : (
                           <>
                             <ShieldCheck className="size-4" /> Claim Settlement

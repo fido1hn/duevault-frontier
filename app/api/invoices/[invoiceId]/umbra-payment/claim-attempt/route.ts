@@ -1,20 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import {
-  assertUmbraClaimPersistenceAllowed,
-  parseUmbraClaimSettlementPayload,
+  parseUmbraClaimAttemptPayload,
   UmbraClaimSettlementError,
 } from "@/features/invoices/claim-settlement";
 import { serializeInvoice } from "@/features/invoices/mappers";
-import type {
-  InvoiceStatus,
-  SerializedUmbraInvoicePayment,
-} from "@/features/invoices/types";
-import { assertInvoiceStatus } from "@/features/invoices/validators";
+import type { SerializedUmbraInvoicePayment } from "@/features/invoices/types";
 import { AuthError, authErrorResponse, requireMerchantProfile } from "@/server/auth";
 import { db } from "@/server/db";
 
-type ClaimUmbraPaymentRouteProps = {
+type ClaimAttemptRouteProps = {
   params: Promise<{
     invoiceId: string;
   }>;
@@ -49,12 +44,12 @@ function assertUmbraPaymentStatus(
 
 export async function POST(
   request: NextRequest,
-  { params }: ClaimUmbraPaymentRouteProps,
+  { params }: ClaimAttemptRouteProps,
 ) {
   try {
     const authContext = await requireMerchantProfile(request);
     const { invoiceId } = await params;
-    const payload = parseUmbraClaimSettlementPayload(await request.json());
+    const payload = parseUmbraClaimAttemptPayload(await request.json());
     const invoice = await db.invoice.findUnique({
       where: {
         merchantProfileId_invoiceNumber: {
@@ -77,6 +72,10 @@ export async function POST(
       return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
     }
 
+    if (invoice.merchantProfileId !== authContext.merchantProfile.id) {
+      return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
+    }
+
     const payment = invoice.umbraPayments[0];
 
     if (!payment) {
@@ -86,47 +85,68 @@ export async function POST(
       );
     }
 
-    assertInvoiceStatus(invoice.status);
-    assertUmbraPaymentStatus(payment.status);
-
-    const decision = assertUmbraClaimPersistenceAllowed({
-      authMerchantProfileId: authContext.merchantProfile.id,
-      invoiceMerchantProfileId: invoice.merchantProfileId,
-      invoiceStatus: invoice.status as InvoiceStatus,
-      paymentStatus: payment.status,
-    });
-
-    if (decision.alreadyClaimed) {
-      return NextResponse.json({ invoice: serializeInvoice(invoice) });
+    if (invoice.status === "Claimed" || invoice.status === "Settled") {
+      return NextResponse.json(
+        { error: "Invoice has already been claimed." },
+        { status: 409 },
+      );
     }
 
-    const claimedAt = new Date();
-    const updatedInvoice = await db.$transaction(async (tx) => {
-      await tx.umbraInvoicePayment.update({
-        where: {
-          id: payment.id,
-        },
-        data: {
-          claimedAt,
-          claimResult: payload.claimResult,
-          claimStatus: "confirmed",
-          claimLastError: null,
-        },
+    assertUmbraPaymentStatus(payment.status);
+
+    if (payment.status !== "confirmed") {
+      return NextResponse.json(
+        { error: "Only confirmed Umbra payments can be claimed." },
+        { status: 409 },
+      );
+    }
+
+    if (payload.phase === "started") {
+      if (payment.claimStatus === "confirmed") {
+        return NextResponse.json(
+          { error: "This payment has already been claimed." },
+          { status: 409 },
+        );
+      }
+
+      const updatedInvoice = await db.$transaction(async (tx) => {
+        await tx.umbraInvoicePayment.update({
+          where: { id: payment.id },
+          data: {
+            claimStatus: "pending",
+            claimAttempts: { increment: 1 },
+            claimLastAttemptedAt: new Date(),
+            claimLastError: null,
+          },
+        });
+
+        return tx.invoice.findUniqueOrThrow({
+          where: { id: invoice.id },
+          include: invoiceInclude,
+        });
       });
 
-      await tx.invoice.update({
-        where: {
-          id: invoice.id,
-        },
+      return NextResponse.json({ invoice: serializeInvoice(updatedInvoice) });
+    }
+
+    if (payment.claimStatus !== "pending") {
+      return NextResponse.json(
+        { error: "No claim attempt is currently in flight to mark failed." },
+        { status: 409 },
+      );
+    }
+
+    const updatedInvoice = await db.$transaction(async (tx) => {
+      await tx.umbraInvoicePayment.update({
+        where: { id: payment.id },
         data: {
-          status: "Claimed",
+          claimStatus: "failed",
+          claimLastError: payload.error,
         },
       });
 
       return tx.invoice.findUniqueOrThrow({
-        where: {
-          id: invoice.id,
-        },
+        where: { id: invoice.id },
         include: invoiceInclude,
       });
     });
@@ -149,7 +169,7 @@ export async function POST(
         error:
           error instanceof Error
             ? error.message
-            : "Unable to claim Umbra payment.",
+            : "Unable to record claim attempt.",
       },
       { status: 400 },
     );

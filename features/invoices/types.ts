@@ -49,6 +49,10 @@ export type SerializedUmbraInvoicePayment = {
   claimedAt: string | null;
   claimResult: unknown | null;
   confirmedAt: string | null;
+  claimStatus: "pending" | "failed" | "confirmed" | null;
+  claimAttempts: number;
+  claimLastError: string | null;
+  claimLastAttemptedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -127,6 +131,10 @@ export type ClaimUmbraInvoicePaymentInput = {
   createUtxoSignature: string;
   claimResult: unknown;
 };
+
+export type RecordUmbraClaimAttemptInput =
+  | { createUtxoSignature: string; phase: "started" }
+  | { createUtxoSignature: string; phase: "failed"; error: string };
 
 export type InvoiceLineItemCreateData = {
   description: string;

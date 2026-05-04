@@ -185,6 +185,10 @@ model UmbraInvoicePayment {
   claimedAt                   DateTime?
   claimResult                 Json?
   confirmedAt                 DateTime?
+  claimStatus                 String?
+  claimAttempts               Int             @default(0)
+  claimLastError              String?
+  claimLastAttemptedAt        DateTime?
   createdAt                   DateTime        @default(now())
   updatedAt                   DateTime        @updatedAt
 
