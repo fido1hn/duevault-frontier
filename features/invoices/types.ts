@@ -1,4 +1,5 @@
 import type {
+  CLAIM_STATUSES,
   INVOICE_MINTS,
   INVOICE_STATUSES,
   PAYMENT_RAILS,
@@ -10,6 +11,7 @@ import type {
 } from "@/features/merchant-profiles/types";
 
 export type InvoiceStatus = (typeof INVOICE_STATUSES)[number];
+export type ClaimStatus = (typeof CLAIM_STATUSES)[number];
 export type PaymentRail = (typeof PAYMENT_RAILS)[number];
 export type PrivacyRail = (typeof PRIVACY_RAILS)[number];
 export type InvoiceMint = (typeof INVOICE_MINTS)[number];
@@ -49,7 +51,7 @@ export type SerializedUmbraInvoicePayment = {
   claimedAt: string | null;
   claimResult: unknown | null;
   confirmedAt: string | null;
-  claimStatus: "pending" | "failed" | "confirmed" | null;
+  claimStatus: ClaimStatus | null;
   claimAttempts: number;
   claimLastError: string | null;
   claimLastAttemptedAt: string | null;

@@ -45,14 +45,11 @@ import { useUmbraMerchantSession } from "@/hooks/use-umbra-merchant-session";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import { withTransientRetry } from "@/lib/umbra/retry";
 import { claimIncomingPayments } from "@/lib/umbra/sdk";
+import { truncateMiddle } from "@/lib/utils";
 
 const RETRY_ATTEMPTS = 3;
 const ALREADY_CLAIMED_MESSAGE =
   "This payment may have been claimed in a previous attempt. Refresh the page to verify; if it stays unclaimed, contact support.";
-
-function truncate(value: string) {
-  return `${value.slice(0, 8)}...${value.slice(-8)}`;
-}
 
 export default function SettlementPage() {
   const params = useParams<{ invoiceId: string }>();
@@ -453,7 +450,7 @@ export default function SettlementPage() {
                     <span className="text-foreground">
                       {latestUmbraPayment ? (
                         <>
-                          {truncate(latestUmbraPayment.createUtxoSignature)}
+                          {truncateMiddle(latestUmbraPayment.createUtxoSignature)}
                           <ExternalLink className="ml-1 inline size-3" />
                         </>
                       ) : (

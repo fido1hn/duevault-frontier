@@ -58,11 +58,22 @@ async function proxyToIndexer(
       // @ts-expect-error — Node 18+ fetch supports duplex for streaming bodies
       duplex: "half",
       cache: "no-store",
+      // Bounds the connection setup and initial response. A mid-stream stall
+      // is not bounded by this signal — the client's withTransientRetry will
+      // catch broken streams and retry.
+      signal: AbortSignal.timeout(30_000),
     });
-  } catch {
+  } catch (error) {
+    const isTimeout =
+      error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError");
     return NextResponse.json(
-      { error: "Unable to reach Umbra indexer." },
-      { status: 502 },
+      {
+        error: isTimeout
+          ? "Umbra indexer timed out."
+          : "Unable to reach Umbra indexer.",
+      },
+      { status: isTimeout ? 504 : 502 },
     );
   }
 

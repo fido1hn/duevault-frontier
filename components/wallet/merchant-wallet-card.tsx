@@ -37,13 +37,9 @@ import {
 } from "@/features/wallet/merchant-balance";
 import { usePrivyUmbraSigner } from "@/hooks/use-privy-umbra-signer";
 import { getUmbraCheckoutMint } from "@/lib/umbra/config";
-import { cn } from "@/lib/utils";
+import { cn, truncateMiddle } from "@/lib/utils";
 
 type WithdrawResult = Awaited<ReturnType<typeof withdrawMerchantPrivateBalance>>;
-
-function truncateSignature(value: string) {
-  return `${value.slice(0, 8)}...${value.slice(-8)}`;
-}
 
 function getBalanceToneClass(state: MerchantBalanceView["state"]) {
   if (state === "available") {
@@ -73,7 +69,7 @@ function SignatureRow({
       <div className="min-w-0">
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
         <p className="truncate font-mono text-xs text-foreground">
-          {truncateSignature(value)}
+          {truncateMiddle(value)}
         </p>
       </div>
       <Button

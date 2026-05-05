@@ -42,17 +42,26 @@ export async function GET(
       safePath === "manifest.json"
         ? {
             cache: "no-store",
+            signal: AbortSignal.timeout(30_000),
           }
         : {
             next: {
               revalidate: 86_400,
             },
+            signal: AbortSignal.timeout(30_000),
           },
     );
-  } catch {
+  } catch (error) {
+    const isTimeout =
+      error instanceof Error &&
+      (error.name === "TimeoutError" || error.name === "AbortError");
     return NextResponse.json(
-      { error: "Unable to reach Umbra ZK asset host." },
-      { status: 502 },
+      {
+        error: isTimeout
+          ? "Umbra ZK asset host timed out."
+          : "Unable to reach Umbra ZK asset host.",
+      },
+      { status: isTimeout ? 504 : 502 },
     );
   }
 

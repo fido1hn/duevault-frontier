@@ -5,6 +5,7 @@ import {
   buildUmbraInvoiceOptionalData,
 } from "@/features/checkout/service";
 import { decodeUmbraDepositEventsFromLogs } from "@/features/checkout/umbra-payment-verification";
+import { INVOICE_STATUS } from "@/features/invoices/constants";
 import { serializeInvoice } from "@/features/invoices/mappers";
 import type {
   ConfirmUmbraInvoicePaymentInput,
@@ -261,7 +262,7 @@ export async function POST(
             id: invoice.id,
           },
           data: {
-            status: "Detected",
+            status: INVOICE_STATUS.Detected,
           },
         });
       }

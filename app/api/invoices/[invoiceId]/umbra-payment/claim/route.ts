@@ -5,6 +5,10 @@ import {
   parseUmbraClaimSettlementPayload,
   UmbraClaimSettlementError,
 } from "@/features/invoices/claim-settlement";
+import {
+  CLAIM_STATUS,
+  INVOICE_STATUS,
+} from "@/features/invoices/constants";
 import { serializeInvoice } from "@/features/invoices/mappers";
 import type {
   InvoiceStatus,
@@ -109,7 +113,7 @@ export async function POST(
         data: {
           claimedAt,
           claimResult: payload.claimResult,
-          claimStatus: "confirmed",
+          claimStatus: CLAIM_STATUS.Confirmed,
           claimLastError: null,
         },
       });
@@ -119,7 +123,7 @@ export async function POST(
           id: invoice.id,
         },
         data: {
-          status: "Claimed",
+          status: INVOICE_STATUS.Claimed,
         },
       });
 

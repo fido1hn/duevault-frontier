@@ -25,7 +25,7 @@ const invoiceInclude = {
     orderBy: {
       createdAt: "desc",
     },
-    take: 1,
+    take: 5,
   },
 } satisfies Prisma.InvoiceInclude;
 

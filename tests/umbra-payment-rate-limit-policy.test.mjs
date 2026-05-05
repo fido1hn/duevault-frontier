@@ -88,6 +88,32 @@ describe("Umbra payment save rate-limit policy", () => {
     ]);
   });
 
+  test("returns 503 with retry-after when a limiter throws", async () => {
+    const throwingLimiter = {
+      limit: async () => {
+        throw new Error("KV unreachable");
+      },
+    };
+
+    const result = await checkUmbraPaymentSaveRateLimitWithLimiters({
+      limiters: {
+        ip: throwingLimiter,
+        ipAndPublicId: throwingLimiter,
+        publicId: throwingLimiter,
+      },
+      publicId: "invoice_1",
+      request: requestWithHeaders({
+        "x-forwarded-for": "203.0.113.10",
+      }),
+    });
+
+    expect(result).toMatchObject({
+      allowed: false,
+      status: 503,
+      retryAfterSeconds: 30,
+    });
+  });
+
   test("returns 429 and stops when a limiter rejects", async () => {
     const calls = [];
     const limiters = {

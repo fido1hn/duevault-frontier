@@ -1,5 +1,7 @@
+import { CLAIM_STATUSES } from "@/features/invoices/constants";
 import type { InvoiceRecord } from "@/features/invoices/repository";
 import type {
+  ClaimStatus,
   PublicUmbraPaymentStatus,
   SerializedInvoice,
   SerializedUmbraInvoicePayment,
@@ -59,12 +61,10 @@ function assertUmbraInvoicePaymentStatus(
   }
 }
 
-function normalizeClaimStatus(
-  value: string | null,
-): SerializedUmbraInvoicePayment["claimStatus"] {
+function normalizeClaimStatus(value: string | null): ClaimStatus | null {
   if (value === null) return null;
-  if (value === "pending" || value === "failed" || value === "confirmed") {
-    return value;
+  if ((CLAIM_STATUSES as readonly string[]).includes(value)) {
+    return value as ClaimStatus;
   }
   throw new Error("Invalid Umbra invoice claim status.");
 }
@@ -108,6 +108,27 @@ export function serializeUmbraInvoicePayment(
 
 function previewSignature(signature: string) {
   return `${signature.slice(0, 8)}...${signature.slice(-8)}`;
+}
+
+function pickActiveUmbraPayment(
+  payments: InvoiceRecord["umbraPayments"],
+): InvoiceRecord["umbraPayments"][number] | null {
+  if (payments.length === 0) return null;
+
+  const active = payments.find((payment) => payment.status !== "failed");
+  if (active) {
+    const activeCount = payments.filter(
+      (payment) => payment.status !== "failed",
+    ).length;
+    if (activeCount > 1) {
+      console.warn(
+        `Invoice ${active.invoiceId} has ${activeCount} non-failed Umbra payments; expected 1.`,
+      );
+    }
+    return active;
+  }
+
+  return payments[0];
 }
 
 export function serializePublicUmbraPaymentStatus(
@@ -195,9 +216,10 @@ export function serializeInvoice(invoice: InvoiceRecord): SerializedInvoice {
         sortOrder: item.sortOrder,
       };
     }),
-    latestUmbraPayment: invoice.umbraPayments[0]
-      ? serializeUmbraInvoicePayment(invoice.umbraPayments[0])
-      : null,
+    latestUmbraPayment: (() => {
+      const active = pickActiveUmbraPayment(invoice.umbraPayments);
+      return active ? serializeUmbraInvoicePayment(active) : null;
+    })(),
     createdAt: invoice.createdAt.toISOString(),
     updatedAt: invoice.updatedAt.toISOString(),
   };

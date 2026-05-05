@@ -44,6 +44,7 @@ import type {
   SerializedUmbraInvoicePayment,
 } from "@/features/invoices/types";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
+import { truncateMiddle } from "@/lib/utils";
 
 type CheckoutUmbraPaymentProps = {
   amountDisplay: string;
@@ -64,10 +65,6 @@ type SaveUmbraPaymentResponse = {
   payment?: PublicUmbraPaymentStatus;
   error?: string;
 };
-
-function truncateAddress(value: string) {
-  return `${value.slice(0, 6)}...${value.slice(-6)}`;
-}
 
 async function saveUmbraPayment(publicId: string, result: CustomerUmbraPaymentResult) {
   const response = await fetch(
@@ -159,7 +156,7 @@ function CheckoutUmbraPaymentDemo({
             <p className="text-xs font-medium text-slate-500">Merchant receiver</p>
             <p className="mt-1 truncate font-mono text-sm text-slate-900">
               {umbra.merchantWalletAddress
-                ? truncateAddress(umbra.merchantWalletAddress)
+                ? truncateMiddle(umbra.merchantWalletAddress, { prefix: 6, suffix: 6 })
                 : "Not ready"}
             </p>
           </div>
@@ -564,7 +561,7 @@ function CheckoutUmbraPaymentInner({
                 <SelectContent>
                   {solanaWallets.map((wallet) => (
                     <SelectItem key={wallet.address} value={wallet.address}>
-                      {wallet.standardWallet.name} {truncateAddress(wallet.address)}
+                      {wallet.standardWallet.name} {truncateMiddle(wallet.address, { prefix: 6, suffix: 6 })}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -572,7 +569,7 @@ function CheckoutUmbraPaymentInner({
             ) : (
               <p className="mt-1 truncate font-mono text-sm text-slate-900">
                 {customerWalletAddress
-                  ? truncateAddress(customerWalletAddress)
+                  ? truncateMiddle(customerWalletAddress, { prefix: 6, suffix: 6 })
                   : "Not connected"}
               </p>
             )}
@@ -582,7 +579,7 @@ function CheckoutUmbraPaymentInner({
             <div className="mt-1 flex items-center justify-between gap-3">
               <p className="truncate font-mono text-sm text-slate-900">
                 {umbra.merchantWalletAddress
-                  ? truncateAddress(umbra.merchantWalletAddress)
+                  ? truncateMiddle(umbra.merchantWalletAddress, { prefix: 6, suffix: 6 })
                   : "Not ready"}
               </p>
               <Button
@@ -712,7 +709,7 @@ function SignatureRow({
     <div className="flex items-center justify-between gap-3">
       <div className="min-w-0">
         <p className="font-medium text-slate-700">{label}</p>
-        <p className="truncate font-mono">{truncateAddress(signature)}</p>
+        <p className="truncate font-mono">{truncateMiddle(signature, { prefix: 6, suffix: 6 })}</p>
       </div>
       <Button
         type="button"

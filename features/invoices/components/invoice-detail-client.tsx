@@ -22,15 +22,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useInvoiceQuery } from "@/features/invoices/queries";
 import { getInvoiceUmbraSettlementView } from "@/features/invoices/settlement-view";
 import { getPaymentMintConfig } from "@/features/payments/mints";
-import { cn } from "@/lib/utils";
+import { cn, truncateMiddle } from "@/lib/utils";
 
 type InvoiceDetailClientProps = {
   invoiceId: string;
 };
-
-function truncateSignature(value: string) {
-  return `${value.slice(0, 8)}...${value.slice(-8)}`;
-}
 
 export function InvoiceDetailClient({ invoiceId }: InvoiceDetailClientProps) {
   const { profile } = useMerchantProfile();
@@ -318,7 +314,7 @@ export function InvoiceDetailClient({ invoiceId }: InvoiceDetailClientProps) {
                       </p>
                       {latestUmbraPayment && (
                         <p className="mt-3 font-mono text-xs text-muted-foreground">
-                          {truncateSignature(
+                          {truncateMiddle(
                             latestUmbraPayment.createUtxoSignature,
                           )}
                         </p>

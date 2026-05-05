@@ -29,6 +29,7 @@ import type {
   InvoiceStatus,
   PublicUmbraPaymentStatus,
 } from "@/features/invoices/types";
+import { truncateMiddle } from "@/lib/utils";
 
 const CheckoutQrCode = dynamic(() => import("@/components/checkout-qr-code"), {
   ssr: false,
@@ -58,10 +59,6 @@ const statusToneStyles = {
 };
 
 const statusSteps = ["Awaiting payment", "Payment pending", "Completed"];
-
-function truncateAddress(value: string) {
-  return `${value.slice(0, 6)}...${value.slice(-6)}`;
-}
 
 function formatLastChecked(value: Date | null) {
   if (!value) {
@@ -380,7 +377,7 @@ export function CheckoutQrPayment({ checkout }: CheckoutQrPaymentProps) {
                   <div className="mt-2 flex items-center justify-between gap-3">
                     <p className="truncate font-mono text-sm text-slate-900">
                       {checkout.receiverAddress
-                        ? truncateAddress(checkout.receiverAddress)
+                        ? truncateMiddle(checkout.receiverAddress, { prefix: 6, suffix: 6 })
                         : "Not configured"}
                     </p>
                     <Button

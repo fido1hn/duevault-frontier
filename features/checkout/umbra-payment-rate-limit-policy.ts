@@ -60,7 +60,23 @@ async function checkLimit(
   limiter: UmbraPaymentSaveRateLimiter,
   identifier: string,
 ): Promise<UmbraPaymentRateLimitResult> {
-  const result = await limiter.limit(identifier);
+  let result: Awaited<ReturnType<UmbraPaymentSaveRateLimiter["limit"]>>;
+
+  try {
+    result = await limiter.limit(identifier);
+  } catch {
+    // Hard failure (KV unreachable, credentials revoked). Upstash's
+    // configured fail-open `timeout` already covers KV slowness, so a
+    // throw here is the genuinely-degraded path. Fail closed with a
+    // bounded retry hint so the client backs off instead of hammering.
+    return {
+      allowed: false,
+      status: 503,
+      error:
+        "Rate limiting is temporarily unavailable. Please try again shortly.",
+      retryAfterSeconds: 30,
+    };
+  }
 
   if (result.pending) {
     void result.pending.catch(() => null);

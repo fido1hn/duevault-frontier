@@ -4,6 +4,7 @@ import {
   parseUmbraClaimAttemptPayload,
   UmbraClaimSettlementError,
 } from "@/features/invoices/claim-settlement";
+import { CLAIM_STATUS } from "@/features/invoices/constants";
 import { serializeInvoice } from "@/features/invoices/mappers";
 import type { SerializedUmbraInvoicePayment } from "@/features/invoices/types";
 import { AuthError, authErrorResponse, requireMerchantProfile } from "@/server/auth";
@@ -72,10 +73,6 @@ export async function POST(
       return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
     }
 
-    if (invoice.merchantProfileId !== authContext.merchantProfile.id) {
-      return NextResponse.json({ error: "Invoice not found." }, { status: 404 });
-    }
-
     const payment = invoice.umbraPayments[0];
 
     if (!payment) {
@@ -102,7 +99,7 @@ export async function POST(
     }
 
     if (payload.phase === "started") {
-      if (payment.claimStatus === "confirmed") {
+      if (payment.claimStatus === CLAIM_STATUS.Confirmed) {
         return NextResponse.json(
           { error: "This payment has already been claimed." },
           { status: 409 },
@@ -113,7 +110,7 @@ export async function POST(
         await tx.umbraInvoicePayment.update({
           where: { id: payment.id },
           data: {
-            claimStatus: "pending",
+            claimStatus: CLAIM_STATUS.Pending,
             claimAttempts: { increment: 1 },
             claimLastAttemptedAt: new Date(),
             claimLastError: null,
@@ -129,7 +126,7 @@ export async function POST(
       return NextResponse.json({ invoice: serializeInvoice(updatedInvoice) });
     }
 
-    if (payment.claimStatus !== "pending") {
+    if (payment.claimStatus !== CLAIM_STATUS.Pending) {
       return NextResponse.json(
         { error: "No claim attempt is currently in flight to mark failed." },
         { status: 409 },
@@ -140,7 +137,7 @@ export async function POST(
       await tx.umbraInvoicePayment.update({
         where: { id: payment.id },
         data: {
-          claimStatus: "failed",
+          claimStatus: CLAIM_STATUS.Failed,
           claimLastError: payload.error,
         },
       });
