@@ -66,7 +66,7 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex w-full shrink-0 flex-col border-b border-sidebar-border bg-sidebar px-4 py-4 md:h-screen md:w-64 md:border-r md:border-b-0 md:py-6">
+    <aside className="flex w-full shrink-0 flex-col border-b border-sidebar-border bg-sidebar px-4 py-4 md:h-full md:w-64 md:border-r md:border-b-0 md:py-6">
       <div className="mb-4 flex items-center justify-between gap-3 px-2 md:mb-8">
         <Link href="/" className="flex min-w-0 items-center gap-2">
           <div className="flex size-8 shrink-0 items-center justify-center rounded bg-primary font-serif text-xl font-bold text-primary-foreground">

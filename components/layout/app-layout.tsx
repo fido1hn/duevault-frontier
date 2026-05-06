@@ -11,7 +11,7 @@ type AppLayoutProps = {
 
 export function AppLayout({ children }: AppLayoutProps) {
   return (
-    <div className="flex min-h-screen w-full flex-col overflow-hidden bg-background md:flex-row">
+    <div className="flex min-h-screen w-full flex-col overflow-hidden bg-background md:h-dvh md:min-h-0 md:flex-row">
       <Sidebar />
       <main className="min-h-0 flex-1 overflow-y-auto">
         <motion.div
