@@ -5,9 +5,17 @@ import { getInvoiceUmbraSettlementView } from "../features/invoices/settlement-v
 describe("invoice Umbra settlement card view", () => {
   test("keeps confirmed but unclaimed payments actionable", () => {
     expect(getInvoiceUmbraSettlementView("Detected", "confirmed")).toMatchObject({
-      action: "review_claim",
+      action: "continue_to_settlement",
       tone: "pending",
       title: "Umbra Payment Confirmed",
+    });
+  });
+
+  test("routes submitted payments to settlement with the matching title", () => {
+    expect(getInvoiceUmbraSettlementView("Detected", "submitted")).toMatchObject({
+      action: "continue_to_settlement",
+      tone: "pending",
+      title: "Umbra Payment Submitted",
     });
   });
 
