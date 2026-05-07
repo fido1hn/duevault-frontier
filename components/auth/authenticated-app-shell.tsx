@@ -5,8 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import { Loader2 } from "lucide-react";
 
-import { AppPrivyProvider } from "@/components/providers/privy-provider";
-import { AppQueryProvider } from "@/components/providers/query-provider";
+import { PrivyAppIdMissingScreen } from "@/components/providers/privy-provider";
 import {
   buildHomeRedirectPath,
   buildSafeCurrentPath,
@@ -79,20 +78,20 @@ function AuthenticatedRouteGate({
 export function AuthenticatedAppShell({
   children,
 }: AuthenticatedAppShellProps) {
+  if (!process.env.NEXT_PUBLIC_PRIVY_APP_ID) {
+    return <PrivyAppIdMissingScreen />;
+  }
+
   return (
-    <AppPrivyProvider>
-      <AppQueryProvider>
-        <Suspense
-          fallback={
-            <FullscreenStatus
-              title="Loading workspace"
-              body="Preparing your DueVault workspace."
-            />
-          }
-        >
-          <AuthenticatedRouteGate>{children}</AuthenticatedRouteGate>
-        </Suspense>
-      </AppQueryProvider>
-    </AppPrivyProvider>
+    <Suspense
+      fallback={
+        <FullscreenStatus
+          title="Loading workspace"
+          body="Preparing your DueVault workspace."
+        />
+      }
+    >
+      <AuthenticatedRouteGate>{children}</AuthenticatedRouteGate>
+    </Suspense>
   );
 }

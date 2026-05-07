@@ -15,7 +15,6 @@ import {
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { AppPrivyProvider } from "@/components/providers/privy-provider";
 import {
   Select,
   SelectContent,
@@ -113,11 +112,11 @@ export function CheckoutUmbraPayment({
     return <CheckoutUmbraPaymentDemo {...props} />;
   }
 
-  return (
-    <AppPrivyProvider missingAppIdFallback={<MissingPrivyFallback />}>
-      <CheckoutUmbraPaymentInner {...props} />
-    </AppPrivyProvider>
-  );
+  if (!process.env.NEXT_PUBLIC_PRIVY_APP_ID) {
+    return <MissingPrivyFallback />;
+  }
+
+  return <CheckoutUmbraPaymentInner {...props} />;
 }
 
 function CheckoutUmbraPaymentDemo({

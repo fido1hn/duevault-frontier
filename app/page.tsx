@@ -114,7 +114,7 @@ export default function Home() {
           </Link>
           <nav className="flex items-center gap-2 sm:gap-3">
             <WalletProfileActionShell destination="/dashboard" size="sm">
-              Get Started
+              Login
             </WalletProfileActionShell>
           </nav>
         </header>
@@ -144,9 +144,9 @@ export default function Home() {
 
               <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
                 <Button asChild size="lg" className="h-14 px-8 text-base">
-                  <Link href="/waitlist">
-                    Join Waitlist <ArrowRight className="size-5" />
-                  </Link>
+                  <WalletProfileActionShell destination="/dashboard">
+                    Get Started <ArrowRight className="size-5" />
+                  </WalletProfileActionShell>
                 </Button>
                 <Button
                   asChild

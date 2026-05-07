@@ -26,18 +26,7 @@ export function AppPrivyProvider({
       return missingAppIdFallback;
     }
 
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-6 py-12">
-        <div className="w-full max-w-md rounded-lg border border-card-border bg-card p-6 text-center shadow-sm">
-          <h1 className="font-serif text-2xl font-semibold">
-            Privy app ID missing
-          </h1>
-          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Add NEXT_PUBLIC_PRIVY_APP_ID to your environment to sign in.
-          </p>
-        </div>
-      </div>
-    );
+    return <>{children}</>;
   }
 
   return (
@@ -70,5 +59,20 @@ export function AppPrivyProvider({
     >
       {children}
     </PrivyProvider>
+  );
+}
+
+export function PrivyAppIdMissingScreen() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background px-6 py-12">
+      <div className="w-full max-w-md rounded-lg border border-card-border bg-card p-6 text-center shadow-sm">
+        <h1 className="font-serif text-2xl font-semibold">
+          Privy app ID missing
+        </h1>
+        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+          Add NEXT_PUBLIC_PRIVY_APP_ID to your environment to sign in.
+        </p>
+      </div>
+    </div>
   );
 }

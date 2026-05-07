@@ -1,19 +1,11 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useCallback, useState, type ComponentProps } from "react";
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { WalletProfileActionController } from "@/components/wallet-profile-action";
 import { getSafeNextPath } from "@/features/auth/routing";
-
-const WalletProfileActionBoundary = dynamic(
-  () => import("@/components/wallet-profile-action-boundary"),
-  {
-    ssr: false,
-    loading: () => null,
-  },
-);
 
 type WalletProfileActionShellProps = Omit<
   ComponentProps<typeof Button>,
@@ -85,7 +77,7 @@ export function WalletProfileActionShell({
       </Button>
 
       {hasPrivyAppId && (
-        <WalletProfileActionBoundary
+        <WalletProfileActionController
           actionSignal={actionSignal}
           destination={pendingDestination}
           onActionHandled={handleActionHandled}
