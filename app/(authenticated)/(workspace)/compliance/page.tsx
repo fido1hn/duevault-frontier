@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useStandardWallets } from "@privy-io/react-auth/solana";
 import {
@@ -309,7 +310,16 @@ export default function CompliancePage() {
             <CardTitle className="font-serif text-xl">Issue grant</CardTitle>
             <CardDescription>
               The auditor must already have an Umbra X25519 key registered. They
-              can set one up at duevault.xyz with their wallet.
+              can set one up at{" "}
+              <Link
+                href="/audit"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-4 hover:text-foreground"
+              >
+                duevault.xyz/audit
+              </Link>{" "}
+              with their wallet.
             </CardDescription>
           </CardHeader>
           <CardContent>

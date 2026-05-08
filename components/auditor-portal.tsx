@@ -12,11 +12,11 @@ import {
   Shield,
   ShieldOff,
   Sparkles,
-  Wallet,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { AuditorSetupCard } from "@/components/auditor-setup-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -375,6 +375,8 @@ export function AuditorPortal({
           </p>
         </section>
 
+        {!initialToken && !initialTokenDecodeFailed && <AuditorSetupCard />}
+
         <Card className="border-card-border">
           <CardHeader>
             <CardTitle className="font-serif text-lg">Decrypt invoice</CardTitle>
@@ -463,24 +465,6 @@ export function AuditorPortal({
         </Card>
 
         {evidence && <EvidenceView evidence={evidence} />}
-
-        {!evidence && !isLoading && !error && grantJson.trim().length === 0 && (
-          <Card className="border-dashed border-border bg-muted/10">
-            <CardContent className="flex items-start gap-3 py-6 text-sm text-muted-foreground">
-              <Wallet className="mt-0.5 size-5 shrink-0 text-muted-foreground" />
-              <div className="flex flex-col gap-1">
-                <p className="font-medium text-foreground">
-                  Don't have a grant?
-                </p>
-                <p>
-                  Ask the merchant to issue one for your wallet on their
-                  Compliance page. They'll send you a link that pre-fills this
-                  form.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <footer className="mt-4 flex items-center justify-between border-t border-card-border pt-4 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">

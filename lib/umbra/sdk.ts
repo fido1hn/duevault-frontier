@@ -170,6 +170,28 @@ export function isUmbraUserFullyRegistered(account: QueryUserAccountResult) {
   );
 }
 
+export async function registerAuditorX25519(
+  config: DueVaultConfig,
+  options: UserRegistrationOptions = {},
+) {
+  const client = await createDueVaultClient(config);
+  const register = getUserRegistrationFunction({ client });
+
+  return register({
+    ...options,
+    confidential: true,
+    anonymous: false,
+  });
+}
+
+export function isAuditorX25519Registered(account: QueryUserAccountResult) {
+  return (
+    account.state === "exists" &&
+    account.data.isInitialised &&
+    account.data.isUserAccountX25519KeyRegistered
+  );
+}
+
 export async function depositPrivateBalance(
   config: DueVaultConfig,
   mint: string,
