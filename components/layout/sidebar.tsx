@@ -13,6 +13,7 @@ import {
   LogOut,
   PlusCircle,
   Settings,
+  Shield,
   ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -26,6 +27,7 @@ const navigation = [
   { name: "New Invoice", href: "/invoices/new", icon: PlusCircle },
   { name: "Activity", href: "/activity", icon: Activity },
   { name: "Proofs", href: "/proofs", icon: ShieldCheck },
+  { name: "Compliance", href: "/compliance", icon: Shield },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

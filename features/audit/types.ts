@@ -52,6 +52,13 @@ export type PersistIssuedGrantInput = {
   label: string | null;
 };
 
+export type AuditorInvoiceLineItem = {
+  description: string;
+  quantity: number;
+  unitAmountAtomic: string;
+  totalAtomic: string;
+};
+
 export type AuditorEvidenceResponse = {
   grant: {
     id: string;
@@ -77,6 +84,9 @@ export type AuditorEvidenceResponse = {
     SerializedInvoice,
     "invoiceNumber" | "client" | "clientEmail" | "issuedAt" | "dueAt" | "mint"
   > & {
+    totalAmountAtomic: string;
+    notes: string;
+    lineItems: AuditorInvoiceLineItem[];
     merchantBusinessName: string;
   };
 };

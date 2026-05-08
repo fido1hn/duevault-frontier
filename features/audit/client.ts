@@ -171,6 +171,7 @@ export async function fetchEvidenceForToken(args: {
       response,
       "Unable to load evidence for this grant.",
       payload.error,
+      payload.code,
     );
   }
 

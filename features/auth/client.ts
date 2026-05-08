@@ -10,11 +10,13 @@ const INVALID_PRIVY_ACCESS_TOKEN_MESSAGE =
 
 export class ApiClientError extends Error {
   status: number;
+  code?: string;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string) {
     super(message);
     this.name = "ApiClientError";
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -22,8 +24,9 @@ export function createApiClientError(
   response: Response,
   fallbackMessage: string,
   message?: string,
+  code?: string,
 ) {
-  return new ApiClientError(message ?? fallbackMessage, response.status);
+  return new ApiClientError(message ?? fallbackMessage, response.status, code);
 }
 
 export function isAuthApiClientError(error: unknown) {

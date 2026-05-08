@@ -140,7 +140,11 @@ export async function loadEvidenceForToken(
   const payment = await db.umbraInvoicePayment.findUnique({
     where: { createUtxoSignature: txSignature },
     include: {
-      invoice: true,
+      invoice: {
+        include: {
+          lineItems: { orderBy: { sortOrder: "asc" } },
+        },
+      },
       merchantProfile: true,
     },
   });
@@ -200,6 +204,16 @@ export async function loadEvidenceForToken(
       dueAt: payment.invoice.dueAt.toISOString(),
       mint: payment.invoice
         .mint as AuditorEvidenceResponse["invoice"]["mint"],
+      totalAmountAtomic: payment.invoice.totalAmountAtomic,
+      notes: payment.invoice.notes,
+      lineItems: payment.invoice.lineItems.map((item) => ({
+        description: item.description,
+        quantity: item.quantity,
+        unitAmountAtomic: item.unitAmountAtomic,
+        totalAtomic: (
+          BigInt(item.unitAmountAtomic) * BigInt(item.quantity)
+        ).toString(),
+      })),
       merchantBusinessName: payment.merchantProfile.businessName,
     },
   };
