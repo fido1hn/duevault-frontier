@@ -78,11 +78,35 @@ model MerchantProfile {
   invoices                    Invoice[]
   paymentIntents              PaymentIntent[]
   umbraInvoicePayments        UmbraInvoicePayment[]
+  complianceGrants            ComplianceGrant[]
 
   @@index([contactEmail])
   @@index([primaryWalletId])
   @@index([umbraStatus])
   @@index([umbraWalletAddress])
+}
+
+model ComplianceGrant {
+  id                  String          @id @default(cuid())
+  merchantProfileId   String
+  merchantProfile     MerchantProfile @relation(fields: [merchantProfileId], references: [id], onDelete: Cascade)
+  granterAddress      String
+  auditorAddress      String
+  granterX25519       Bytes
+  auditorX25519       Bytes
+  grantNonce          String
+  issuanceSignature   String
+  invoiceScopeIds     String[]        @default([])
+  label               String?
+  grantedAt           DateTime        @default(now())
+  revokedAt           DateTime?
+  revocationSignature String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([merchantProfileId])
+  @@index([auditorAddress])
+  @@index([granterAddress])
 }
 
 model WaitlistSignup {
