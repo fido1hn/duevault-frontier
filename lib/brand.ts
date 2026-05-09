@@ -1,34 +1,34 @@
 export const BRAND_NAME = "DueVault";
 
 export const BRAND_TAGLINES = [
-  "Private receivables for stablecoin businesses",
-  "Business billing on Solana, with disclosure when needed",
-  "Invoices, settlement, and proof without public books",
+  "Bill in stablecoins. Without the public ledger.",
+  "Private settlement with scoped audit disclosure",
+  "Stablecoin receivables that stay business-private",
 ] as const;
 
 export const BRAND_POSITIONING = {
-  eyebrow: "Private receivables infrastructure",
-  heroTitle: "Accounts receivable for businesses that settle in stablecoins.",
+  eyebrow: "Private stablecoin receivables",
+  heroTitle: "Bill in stablecoins. Without the public ledger.",
   heroDescription:
-    "DueVault gives merchants, freelancers, and internet businesses a professional way to invoice, collect, and reconcile Solana stablecoin payments. Keep receivables and settlement context controlled by default, then share only the records an accountant, operator, or regulator actually needs.",
-  foundationTitle: "Foundation mode, built for the real product",
+    "DueVault gives merchants a Stripe-familiar way to invoice and collect USDC on Solana while keeping customer relationships, revenue, and payment history private by default. When compliance needs proof, disclose only the exact invoice evidence an auditor is allowed to see.",
+  foundationTitle: "Private settlement, accountable disclosure",
   foundationDescription:
-    "This repo is now structured around the private receivables workflow: invoice-style payment requests, checkout, operational records, wallet connectivity, and a clean Umbra integration boundary.",
+    "The product centers on invoice-style payment requests, Umbra private settlement, merchant-owned records, and gated auditor grants scoped to selected payment evidence.",
   homepageDirection: [
     {
-      title: "Receivables first",
-      body: "Create invoice-style payment requests and checkout pages without turning your full business ledger into an onchain dashboard.",
+      title: "Issue",
+      body: "Create business invoices and checkout links without publishing customer and invoice context to the public ledger.",
     },
     {
-      title: "Operational control",
-      body: "Keep off-chain receivable records, merchant activity, and settlement states in one place before wiring live Umbra flows.",
+      title: "Collect",
+      body: "Route Solana stablecoin payments through Umbra so settlement lands privately instead of exposing the merchant wallet graph.",
     },
     {
-      title: "Selective proof",
-      body: "Design for regulated businesses from day one: private by default, accountable when disclosure is required.",
+      title: "Disclose",
+      body: "Issue signature-scoped auditor grants that reveal selected invoice and payment evidence while the rest of the books stay private.",
     },
   ],
 } as const;
 
 export const BRAND_DESCRIPTION =
-  "DueVault is private accounts receivable software built on Umbra for merchants, freelancers, and service businesses that want business-grade Solana stablecoin billing without exposing balances, customers, or revenue onchain.";
+  "DueVault is private stablecoin receivables software built on Umbra for businesses that want Solana settlement without exposing customers, balances, revenue, or audit history onchain.";

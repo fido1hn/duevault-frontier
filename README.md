@@ -1,6 +1,6 @@
 # DueVault
 
-> Private accounts receivable on Umbra for Solana stablecoin businesses.
+> Bill in stablecoins. Without the public ledger.
 
 **Live app:** https://duevault.xyz
 
@@ -9,14 +9,27 @@ Stack: Next.js 16 · TypeScript · Prisma · Supabase · Privy · Umbra SDK · S
 ## What it does
 
 - Merchants sign in with Privy (email or Solana wallet) and complete an Umbra registration tied to their primary Solana wallet.
-- Create payment requests / invoices that resolve to a public, shareable checkout URL.
+- Create invoice-style payment requests that resolve to a public, shareable checkout URL.
 - Customers pay through Umbra's stealth pool from the public checkout. The server verifies the on-chain deposit transaction (instruction discriminator, accounts, token-balance deltas, event log) **and** the matching proof-account transaction before marking a payment confirmed.
 - Merchants run a two-step **Scan → Claim** to settle confirmed payments into their Umbra balance, with retry-aware UI for failed claim attempts.
-- Per-invoice proof-packet download for off-chain receipts.
+- Merchants issue signature-scoped compliance grants by selecting invoices or date ranges. Under the hood, DueVault freezes the exact confirmed Umbra payment signatures in the grant.
+- Auditors open a gated portal, connect the grant-recipient Solana wallet, prove they have an Umbra x25519 account, and review only the invoice/payment evidence the merchant granted.
+
+## Why DueVault
+
+Stablecoin receivables have a sharp privacy problem: public Solana payments can expose customers, invoice size, revenue timing, and treasury relationships. Stripe-style tools feel familiar, but they are custodial and traditional-rails first. DueVault aims for the middle path: self-custodial stablecoin settlement with business-grade records and merchant-controlled selective disclosure.
+
+| Need | DueVault | Stripe | Request Network | Raw Solana Pay |
+|---|---|---|---|---|
+| Stablecoin-native settlement | Yes, Solana USDC through Umbra | Limited / offchain abstraction | Yes | Yes |
+| Payment privacy from public observers | Umbra stealth settlement | Private ledger, custodial | Depends on payment rail | No, wallet metadata is public |
+| Invoice and receivables workflow | Built around merchant invoices | Mature | Built around requests | Manual / external |
+| Auditor disclosure | Wallet-gated, signature-scoped evidence grants | Platform reports | Not DueVault-style Umbra evidence | Manual screenshots / exports |
+| Merchant custody posture | Self-custodial | Custodial | Varies | Self-custodial |
 
 ## Try it in production
 
-Visit https://duevault.xyz, sign in with email or Solana wallet, complete merchant onboarding, and create an invoice. The public checkout link is shareable.
+Visit https://duevault.xyz, sign in with email or Solana wallet, complete merchant onboarding, and create an invoice. The public checkout link is shareable. After a confirmed Umbra payment, the compliance page can issue an auditor grant scoped to selected invoice/payment evidence.
 
 > Production runs on Solana **mainnet** with **USDC**. Real funds — use test amounts.
 
@@ -96,6 +109,7 @@ If you have ten minutes, these are the files that matter:
 | Three-layer rate limiter (IP / IP+publicId / publicId) | [features/checkout/umbra-payment-rate-limit-policy.ts](features/checkout/umbra-payment-rate-limit-policy.ts) + [server/umbra-payment-rate-limit.ts](server/umbra-payment-rate-limit.ts) |
 | Confirm flow — RPC re-verification + invoice transition | [app/api/invoices/[invoiceId]/umbra-payment/confirm/route.ts](app/api/invoices/%5BinvoiceId%5D/umbra-payment/confirm/route.ts) |
 | Claim flow — Scan → Claim two-step + retry tracking | [app/api/invoices/[invoiceId]/umbra-payment/claim/route.ts](app/api/invoices/%5BinvoiceId%5D/umbra-payment/claim/route.ts), [claim-attempt/route.ts](app/api/invoices/%5BinvoiceId%5D/umbra-payment/claim-attempt/route.ts), [features/invoices/claim-settlement.ts](features/invoices/claim-settlement.ts), [features/merchant-profiles/umbra-settlement-claim.ts](features/merchant-profiles/umbra-settlement-claim.ts) |
+| Auditor portal — wallet gate, x25519 setup, scoped evidence workspace | [components/auditor-portal.tsx](components/auditor-portal.tsx), [app/api/audit/evidence-index/route.ts](app/api/audit/evidence-index/route.ts), [app/api/audit/decrypt-evidence/route.ts](app/api/audit/decrypt-evidence/route.ts) |
 | Privacy — invoice id is hashed (`sha256("duevault:invoice:" + publicId)`) before going on-chain | [features/checkout/service.ts:159-163](features/checkout/service.ts#L159-L163) |
 | Database schema | [prisma/schema.prisma](prisma/schema.prisma) |
 | Security headers (CSP TODO is acknowledged inline) | [next.config.ts](next.config.ts) |
