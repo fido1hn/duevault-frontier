@@ -50,6 +50,38 @@ const STEP_LABEL: Record<AuditorUmbraRegistrationStepId, string> = {
 };
 
 export function AuditorSetupCard() {
+  const [hasStarted, setHasStarted] = useState(false);
+
+  if (!hasStarted) {
+    return (
+      <Card className="border-card-border">
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <KeyRound className="size-5" />
+            </div>
+            <div className="flex flex-col">
+              <CardTitle className="font-serif text-lg">
+                Get started as an auditor
+              </CardTitle>
+              <CardDescription>
+                Register a one-time Umbra x25519 key on your Solana wallet so a
+                merchant can issue you an audit grant.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={() => setHasStarted(true)}>Get started</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return <AuditorSetupStartedFlow onCancel={() => setHasStarted(false)} />;
+}
+
+function AuditorSetupStartedFlow({ onCancel }: { onCancel: () => void }) {
   const { ready: privyReady, authenticated, user, login, linkWallet } = usePrivy();
   const linkedSolanaWallets = useMemo(
     () => getLinkedSolanaWallets(user),
@@ -112,6 +144,13 @@ export function AuditorSetupCard() {
     void refreshStatus();
   }, [walletAddress, walletsReady, wallet, refreshStatus]);
 
+  function openLinkWallet() {
+    linkWallet({
+      walletChainType: "solana-only",
+      walletList: SOLANA_WALLET_LIST,
+    });
+  }
+
   async function handleRegister() {
     if (!wallet) {
       toast.error("Connect your Solana wallet first.");
@@ -160,6 +199,7 @@ export function AuditorSetupCard() {
         icon={<Loader2 className="size-5 animate-spin" />}
         title="Loading auditor setup"
         body="Preparing your wallet session."
+        secondaryAction={<CancelButton onClick={onCancel} />}
       />
     );
   }
@@ -175,6 +215,7 @@ export function AuditorSetupCard() {
             Sign in with Privy
           </Button>
         }
+        secondaryAction={<CancelButton onClick={onCancel} />}
       />
     );
   }
@@ -186,17 +227,40 @@ export function AuditorSetupCard() {
         title="Connect a Solana wallet"
         body="Connect the Solana wallet you want merchants to grant audit access to. This wallet will hold your Umbra x25519 keypair on-chain."
         action={
-          <Button
-            onClick={() =>
-              linkWallet({
-                walletChainType: "solana-only",
-                walletList: SOLANA_WALLET_LIST,
-              })
-            }
-            className="w-full md:w-auto"
-          >
+          <Button onClick={openLinkWallet} className="w-full md:w-auto">
             Connect Solana wallet
           </Button>
+        }
+        secondaryAction={<CancelButton onClick={onCancel} />}
+      />
+    );
+  }
+
+  if (statusError) {
+    return (
+      <SetupShell
+        icon={<XCircle className="size-5" />}
+        title="Couldn't reach the Umbra indexer"
+        body={`We couldn't read the on-chain Umbra account for ${truncateMiddle(walletAddress)}: ${statusError}`}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => void refreshStatus()}>Try again</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setStatusError(null);
+                setStatus("unregistered");
+              }}
+            >
+              Continue to register anyway
+            </Button>
+          </div>
+        }
+        secondaryAction={
+          <div className="flex flex-wrap items-center gap-2">
+            <UseDifferentWalletButton onClick={openLinkWallet} />
+            <CancelButton onClick={onCancel} />
+          </div>
         }
       />
     );
@@ -207,19 +271,12 @@ export function AuditorSetupCard() {
       <SetupShell
         icon={<Loader2 className="size-5 animate-spin" />}
         title="Checking your Umbra registration"
-        body={
-          statusError ??
-          `Looking up the on-chain Umbra account for ${truncateMiddle(walletAddress)}.`
-        }
-        action={
-          statusError ? (
-            <Button
-              variant="outline"
-              onClick={() => void refreshStatus()}
-            >
-              Try again
-            </Button>
-          ) : null
+        body={`Looking up the on-chain Umbra account for ${truncateMiddle(walletAddress)}.`}
+        secondaryAction={
+          <div className="flex flex-wrap items-center gap-2">
+            <UseDifferentWalletButton onClick={openLinkWallet} />
+            <CancelButton onClick={onCancel} />
+          </div>
         }
       />
     );
@@ -263,6 +320,9 @@ export function AuditorSetupCard() {
             Once the merchant issues a grant, they'll send you a link that
             opens the audit form below pre-filled.
           </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <UseDifferentWalletButton onClick={openLinkWallet} />
+          </div>
         </CardContent>
       </Card>
     );
@@ -302,7 +362,7 @@ export function AuditorSetupCard() {
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <Button onClick={() => void handleRegister()} disabled={isRegistering}>
             {isRegistering ? (
               <Loader2 className="size-4 animate-spin" />
@@ -311,6 +371,7 @@ export function AuditorSetupCard() {
             )}
             {isRegistering ? "Registering..." : "Register x25519 key"}
           </Button>
+          <UseDifferentWalletButton onClick={openLinkWallet} />
           <p className="text-xs text-muted-foreground">
             You'll be prompted to sign the Umbra consent message and one
             on-chain transaction.
@@ -321,16 +382,40 @@ export function AuditorSetupCard() {
   );
 }
 
+function CancelButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="text-muted-foreground"
+      onClick={onClick}
+    >
+      Cancel
+    </Button>
+  );
+}
+
+function UseDifferentWalletButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button type="button" variant="outline" size="sm" onClick={onClick}>
+      Use a different wallet
+    </Button>
+  );
+}
+
 function SetupShell({
   icon,
   title,
   body,
   action,
+  secondaryAction,
 }: {
   icon: React.ReactNode;
   title: string;
   body: string;
   action?: React.ReactNode;
+  secondaryAction?: React.ReactNode;
 }) {
   return (
     <Card className="border-card-border">
@@ -345,11 +430,14 @@ function SetupShell({
           </div>
         </div>
       </CardHeader>
-      {action && (
-        <CardContent>
-          <div className="flex flex-col gap-2 md:flex-row md:items-center">
-            {action}
-          </div>
+      {(action || secondaryAction) && (
+        <CardContent className="flex flex-col gap-3">
+          {action && (
+            <div className="flex flex-col gap-2 md:flex-row md:items-center">
+              {action}
+            </div>
+          )}
+          {secondaryAction}
         </CardContent>
       )}
     </Card>
