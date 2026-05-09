@@ -1,3 +1,5 @@
+import { formatSolLamports } from "@/features/umbra/costs";
+
 export type AuditorRegistrationStatus =
   | "unknown"
   | "registered"
@@ -21,6 +23,12 @@ export type AuditorGateState =
   | { kind: "checking"; canShowDecryptForm: false; walletAddress: string }
   | { kind: "register"; canShowDecryptForm: false; walletAddress: string }
   | { kind: "ready"; canShowDecryptForm: true; walletAddress: string };
+
+export type AuditorRegistrationFundingState =
+  | { kind: "checking"; canRegister: false; message: string }
+  | { kind: "unavailable"; canRegister: true; message: string }
+  | { kind: "ready"; canRegister: true; message: string }
+  | { kind: "underfunded"; canRegister: false; message: string };
 
 export function getAuditorGateState({
   activeWalletAddress,
@@ -97,4 +105,77 @@ export function getAuditorGateState({
     canShowDecryptForm: true,
     walletAddress: linkedWalletAddress,
   };
+}
+
+export function getAuditorRegistrationFundingState({
+  balanceError,
+  isLoading,
+  requiredSolLamports,
+  solBalanceLamports,
+}: {
+  balanceError: string | null;
+  isLoading: boolean;
+  requiredSolLamports: bigint;
+  solBalanceLamports: bigint | null;
+}): AuditorRegistrationFundingState {
+  if (isLoading) {
+    return {
+      kind: "checking",
+      canRegister: false,
+      message: "Checking SOL balance for Umbra setup fees.",
+    };
+  }
+
+  if (balanceError) {
+    return {
+      kind: "unavailable",
+      canRegister: true,
+      message:
+        "Balance check unavailable. You can still try registration from your wallet.",
+    };
+  }
+
+  if (solBalanceLamports === null) {
+    return {
+      kind: "checking",
+      canRegister: false,
+      message: "Checking SOL balance for Umbra setup fees.",
+    };
+  }
+
+  if (solBalanceLamports !== null && solBalanceLamports < requiredSolLamports) {
+    return {
+      kind: "underfunded",
+      canRegister: false,
+      message: `Add at least ${formatSolLamports(requiredSolLamports)} to register your Umbra x25519 key.`,
+    };
+  }
+
+  return {
+    kind: "ready",
+    canRegister: true,
+    message: "Your wallet has enough SOL for the estimated Umbra setup fees.",
+  };
+}
+
+export function getEffectiveAuditorRegistrationStatus({
+  checkedWalletAddress,
+  isChecking,
+  registrationStatus,
+  targetWalletAddress,
+}: {
+  checkedWalletAddress: string | null;
+  isChecking: boolean;
+  registrationStatus: AuditorRegistrationStatus;
+  targetWalletAddress: string | null;
+}): AuditorRegistrationStatus {
+  if (!targetWalletAddress || checkedWalletAddress !== targetWalletAddress) {
+    return "unknown";
+  }
+
+  if (isChecking && registrationStatus !== "unknown") {
+    return registrationStatus;
+  }
+
+  return registrationStatus;
 }

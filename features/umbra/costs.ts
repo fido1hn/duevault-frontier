@@ -4,6 +4,7 @@ export const UMBRA_COST_ESTIMATE_LAMPORTS = {
   registeredPayment: 6_000_000n,
   firstTimeCustomerPayment: 21_000_000n,
   merchantRegistration: 15_000_000n,
+  auditorRegistration: 15_000_000n,
 } as const;
 
 export type UmbraBalanceReadiness = {

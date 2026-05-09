@@ -33,6 +33,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   getAuditorGateState,
+  getAuditorRegistrationFundingState,
+  getEffectiveAuditorRegistrationStatus,
   type AuditorRegistrationStatus,
 } from "@/features/audit/auditor-gate";
 import {
@@ -57,6 +59,12 @@ import { ApiClientError } from "@/features/auth/client";
 import { atomicToNumber } from "@/features/invoices/validators";
 import { getPaymentMintDisplayName } from "@/features/payments/mints";
 import { createPrivyUmbraSigner } from "@/features/checkout/privy-umbra-signer";
+import {
+  fetchWalletSolBalance,
+  formatSolLamports,
+  UMBRA_COST_ESTIMATE_LAMPORTS,
+} from "@/features/umbra/costs";
+import { normalizeUmbraError } from "@/features/umbra/errors";
 import { usePrivyUmbraSigner } from "@/hooks/use-privy-umbra-signer";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import {
@@ -369,6 +377,9 @@ export function AuditorPortal({
   );
   const [isLoading, setIsLoading] = useState(false);
   const [evidence, setEvidence] = useState<AuditorEvidenceResponse | null>(null);
+  const runtimeConfig = useMemo(() => getUmbraRuntimeConfig(), []);
+  const requiredAuditorRegistrationSol =
+    UMBRA_COST_ESTIMATE_LAMPORTS.auditorRegistration;
   const parsedGateToken = useMemo(() => {
     try {
       return parseGrantTokenPayload(JSON.parse(grantJson));
@@ -391,6 +402,9 @@ export function AuditorPortal({
     usePrivyUmbraSigner(targetWalletAddress);
   const [registrationStatus, setRegistrationStatus] =
     useState<AuditorRegistrationStatus>("unknown");
+  const [registrationWalletAddress, setRegistrationWalletAddress] = useState<
+    string | null
+  >(null);
   const [registrationError, setRegistrationError] = useState<string | null>(
     null,
   );
@@ -398,12 +412,29 @@ export function AuditorPortal({
   const [registrationStep, setRegistrationStep] =
     useState<AuditorUmbraRegistrationStepId | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
-  const effectiveRegistrationStatus =
-    registrationError && !isCheckingRegistration
-      ? "unregistered"
-      : isCheckingRegistration
-        ? "unknown"
-        : registrationStatus;
+  const [auditorSolBalance, setAuditorSolBalance] = useState<bigint | null>(
+    null,
+  );
+  const [auditorSolBalanceError, setAuditorSolBalanceError] = useState<
+    string | null
+  >(null);
+  const [isAuditorSolBalanceLoading, setIsAuditorSolBalanceLoading] =
+    useState(false);
+  const effectiveRegistrationStatus = getEffectiveAuditorRegistrationStatus({
+    checkedWalletAddress: registrationWalletAddress,
+    isChecking: isCheckingRegistration,
+    registrationStatus:
+      registrationError && !isCheckingRegistration
+        ? "unregistered"
+        : registrationStatus,
+    targetWalletAddress: wallet?.address ?? null,
+  });
+  const auditorRegistrationFundingState = getAuditorRegistrationFundingState({
+    balanceError: auditorSolBalanceError,
+    isLoading: isAuditorSolBalanceLoading,
+    requiredSolLamports: requiredAuditorRegistrationSol,
+    solBalanceLamports: auditorSolBalance,
+  });
   const gateState = getAuditorGateState({
     activeWalletAddress: wallet?.address ?? null,
     authenticated,
@@ -416,11 +447,11 @@ export function AuditorPortal({
 
   const refreshRegistrationStatus = useCallback(async () => {
     if (!wallet) return;
+    const walletAddress = wallet.address;
     setIsCheckingRegistration(true);
     setRegistrationError(null);
 
     try {
-      const runtimeConfig = getUmbraRuntimeConfig();
       const signer = createPrivyUmbraSigner({
         wallet,
         signTransaction,
@@ -434,34 +465,101 @@ export function AuditorPortal({
           deferMasterSeedSignature: true,
           preferPollingTransactionForwarder: true,
         },
-        wallet.address,
+        walletAddress,
       );
       setRegistrationStatus(
         isAuditorX25519Registered(account) ? "registered" : "unregistered",
       );
+      setRegistrationWalletAddress(walletAddress);
     } catch (err) {
+      const normalized = normalizeUmbraError("Umbra account check", err);
+      console.error("[Auditor Umbra registration check] failed", {
+        category: normalized.category,
+        debugMessage: normalized.debugMessage,
+        error: err,
+      });
       setRegistrationStatus("unknown");
-      setRegistrationError(
-        err instanceof Error
-          ? err.message
-          : "Unable to check Umbra registration status.",
-      );
+      setRegistrationWalletAddress(walletAddress);
+      setRegistrationError(normalized.userMessage);
     } finally {
       setIsCheckingRegistration(false);
     }
-  }, [signMessage, signTransaction, wallet]);
+  }, [runtimeConfig, signMessage, signTransaction, wallet]);
 
   useEffect(() => {
-    setRegistrationStatus("unknown");
-    setRegistrationError(null);
-    setRegistrationStep(null);
+    const walletAddress = wallet?.address ?? null;
 
-    if (!wallet || !walletsReady) {
+    if (!walletAddress || !walletsReady) {
       return;
     }
 
-    void refreshRegistrationStatus();
-  }, [refreshRegistrationStatus, wallet, walletsReady]);
+    if (registrationWalletAddress !== walletAddress) {
+      setRegistrationStatus("unknown");
+      setRegistrationError(null);
+      setRegistrationStep(null);
+      void refreshRegistrationStatus();
+      return;
+    }
+
+    if (
+      registrationStatus === "unknown" &&
+      !registrationError &&
+      !isCheckingRegistration
+    ) {
+      void refreshRegistrationStatus();
+    }
+  }, [
+    isCheckingRegistration,
+    refreshRegistrationStatus,
+    registrationError,
+    registrationStatus,
+    registrationWalletAddress,
+    wallet?.address,
+    walletsReady,
+  ]);
+
+  useEffect(() => {
+    const walletAddress = wallet?.address ?? null;
+    let isCurrent = true;
+
+    if (!walletAddress || !walletsReady) {
+      setAuditorSolBalance(null);
+      setAuditorSolBalanceError(null);
+      setIsAuditorSolBalanceLoading(false);
+      return;
+    }
+
+    setIsAuditorSolBalanceLoading(true);
+    setAuditorSolBalanceError(null);
+
+    void fetchWalletSolBalance({
+      rpcUrl: runtimeConfig.rpcUrl,
+      walletAddress,
+    })
+      .then((balance) => {
+        if (!isCurrent) return;
+        setAuditorSolBalance(balance);
+      })
+      .catch((err) => {
+        if (!isCurrent) return;
+        const normalized = normalizeUmbraError("SOL balance check", err);
+        console.error("[Auditor SOL balance check] failed", {
+          category: normalized.category,
+          debugMessage: normalized.debugMessage,
+          error: err,
+        });
+        setAuditorSolBalance(null);
+        setAuditorSolBalanceError(normalized.userMessage);
+      })
+      .finally(() => {
+        if (!isCurrent) return;
+        setIsAuditorSolBalanceLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [runtimeConfig.rpcUrl, wallet?.address, walletsReady]);
 
   function reset() {
     setEvidence(null);
@@ -481,6 +579,12 @@ export function AuditorPortal({
       return;
     }
 
+    if (!auditorRegistrationFundingState.canRegister) {
+      setRegistrationError(auditorRegistrationFundingState.message);
+      toast.error(auditorRegistrationFundingState.message);
+      return;
+    }
+
     setIsRegistering(true);
     setRegistrationError(null);
     setRegistrationStep("checking");
@@ -493,19 +597,25 @@ export function AuditorPortal({
         onStep: setRegistrationStep,
       });
       setRegistrationStatus("registered");
+      setRegistrationWalletAddress(wallet.address);
       toast.success(
         result.alreadyRegistered
           ? "Your Umbra x25519 key was already registered."
           : "Umbra x25519 key registered.",
       );
     } catch (err) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Unable to register your Umbra x25519 key.";
-      setRegistrationError(message);
+      const normalized = normalizeUmbraError(
+        "Auditor x25519 registration",
+        err,
+      );
+      console.error("[Auditor Umbra registration] failed", {
+        category: normalized.category,
+        debugMessage: normalized.debugMessage,
+        error: err,
+      });
+      setRegistrationError(normalized.userMessage);
       setRegistrationStep("error");
-      toast.error(message);
+      toast.error(normalized.userMessage);
     } finally {
       setIsRegistering(false);
     }
@@ -696,10 +806,62 @@ export function AuditorPortal({
                     </div>
                   )}
 
+                  <div className="grid gap-3 rounded-md border border-border bg-muted/10 p-3 text-sm md:grid-cols-2">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                        You need
+                      </span>
+                      <span className="font-mono text-foreground">
+                        {formatSolLamports(requiredAuditorRegistrationSol)}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-xs uppercase tracking-wider text-muted-foreground">
+                        Your wallet has
+                      </span>
+                      <span className="font-mono text-foreground">
+                        {isAuditorSolBalanceLoading ? (
+                          <span className="inline-flex items-center gap-1.5">
+                            <Loader2 className="size-3 animate-spin" />
+                            Checking
+                          </span>
+                        ) : auditorSolBalance !== null ? (
+                          formatSolLamports(auditorSolBalance)
+                        ) : (
+                          "Balance unavailable"
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  {auditorRegistrationFundingState.kind !== "ready" && (
+                    <div
+                      className={cn(
+                        "flex items-start gap-2 rounded-md border px-3 py-2 text-sm",
+                        auditorRegistrationFundingState.kind === "underfunded"
+                          ? "border-destructive/20 bg-[var(--status-overdue-bg)] text-destructive"
+                          : "border-border bg-muted/10 text-muted-foreground",
+                      )}
+                    >
+                      {auditorRegistrationFundingState.kind ===
+                      "underfunded" ? (
+                        <XCircle className="mt-0.5 size-4 shrink-0" />
+                      ) : isAuditorSolBalanceLoading ? (
+                        <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" />
+                      ) : (
+                        <Wallet className="mt-0.5 size-4 shrink-0" />
+                      )}
+                      <span>{auditorRegistrationFundingState.message}</span>
+                    </div>
+                  )}
+
                   <div className="flex flex-wrap items-center gap-3">
                     <Button
                       onClick={() => void handleRegister()}
-                      disabled={isRegistering}
+                      disabled={
+                        isRegistering ||
+                        !auditorRegistrationFundingState.canRegister
+                      }
                     >
                       {isRegistering ? (
                         <Loader2 className="size-4 animate-spin" />

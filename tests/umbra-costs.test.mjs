@@ -14,6 +14,9 @@ describe("Umbra cost estimates", () => {
       21_000_000n,
     );
     expect(UMBRA_COST_ESTIMATE_LAMPORTS.merchantRegistration).toBe(15_000_000n);
+    expect(UMBRA_COST_ESTIMATE_LAMPORTS.auditorRegistration).toBe(
+      UMBRA_COST_ESTIMATE_LAMPORTS.merchantRegistration,
+    );
   });
 
   test("formats SOL lamports without noisy trailing decimals", () => {

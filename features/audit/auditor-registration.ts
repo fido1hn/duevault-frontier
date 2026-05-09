@@ -8,6 +8,7 @@ import type {
 import type { QueryUserAccountResult } from "@umbra-privacy/sdk/types";
 
 import { createPrivyUmbraSigner } from "@/features/checkout/privy-umbra-signer";
+import { toUmbraUserFacingError } from "@/features/umbra/errors";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import {
   isAuditorX25519Registered,
@@ -37,31 +38,6 @@ type RunAuditorUmbraRegistrationInput = {
   onStep?: (step: AuditorUmbraRegistrationStepId) => void;
 };
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function getUmbraErrorStage(error: unknown) {
-  if (!error || typeof error !== "object" || !("stage" in error)) {
-    return null;
-  }
-
-  const stage = (error as { stage?: unknown }).stage;
-
-  return typeof stage === "string" && stage.length > 0 ? stage : null;
-}
-
-function describeUmbraFailure(action: string, error: unknown) {
-  const message = getErrorMessage(error);
-  const stage = getUmbraErrorStage(error);
-
-  if (message === "Failed to fetch" || message === "fetch failed") {
-    return `${action} failed because an Umbra network request could not be reached. Restart the dev server and retry; if it persists, check the configured RPC and Umbra ZK asset proxy.`;
-  }
-
-  return `${action} failed${stage ? ` during ${stage}` : ""}: ${message}`;
-}
-
 export async function runAuditorUmbraRegistration({
   wallet,
   signTransaction,
@@ -89,7 +65,7 @@ export async function runAuditorUmbraRegistration({
   try {
     currentAccount = await queryDueVaultUserRegistration(config, walletAddress);
   } catch (error) {
-    throw new Error(describeUmbraFailure("Umbra account check", error));
+    throw toUmbraUserFacingError("Umbra account check", error);
   }
 
   if (isAuditorX25519Registered(currentAccount)) {
@@ -126,7 +102,7 @@ export async function runAuditorUmbraRegistration({
       },
     });
   } catch (error) {
-    throw new Error(describeUmbraFailure("Auditor x25519 registration", error));
+    throw toUmbraUserFacingError("Auditor x25519 registration", error);
   }
 
   onStep?.("verifying");
@@ -135,9 +111,7 @@ export async function runAuditorUmbraRegistration({
   try {
     verifiedAccount = await queryDueVaultUserRegistration(config, walletAddress);
   } catch (error) {
-    throw new Error(
-      describeUmbraFailure("Auditor post-registration check", error),
-    );
+    throw toUmbraUserFacingError("Auditor post-registration check", error);
   }
 
   if (!isAuditorX25519Registered(verifiedAccount)) {
