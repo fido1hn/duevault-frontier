@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import {
   CheckCircle2,
@@ -41,8 +41,12 @@ import {
   runAuditorUmbraRegistration,
   type AuditorUmbraRegistrationStepId,
 } from "@/features/audit/auditor-registration";
-import { fetchEvidenceForToken } from "@/features/audit/client";
+import {
+  fetchEvidenceForToken,
+  fetchEvidenceIndexForToken,
+} from "@/features/audit/client";
 import type {
+  AuditorEvidenceIndexItem,
   AuditorEvidenceResponse,
   GrantTokenPayload,
 } from "@/features/audit/types";
@@ -347,6 +351,47 @@ function EvidenceView({ evidence }: { evidence: AuditorEvidenceResponse }) {
   );
 }
 
+function EvidenceIndexButton({
+  isSelected,
+  item,
+  onSelect,
+}: {
+  isSelected: boolean;
+  item: AuditorEvidenceIndexItem;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className={cn(
+        "flex w-full flex-col gap-1 rounded-md border px-3 py-3 text-left transition-colors hover:bg-muted/30",
+        isSelected ? "border-primary bg-primary/5" : "border-border bg-card",
+      )}
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span className="truncate font-medium text-foreground">
+          {item.invoiceNumber}
+        </span>
+        <Badge variant="outline" className="shrink-0 bg-card text-[10px]">
+          {item.status}
+        </Badge>
+      </span>
+      <span className="truncate text-xs text-muted-foreground">
+        {item.client}
+      </span>
+      <span className="text-xs text-muted-foreground">
+        {item.confirmedAt
+          ? dateFormatter.format(new Date(item.confirmedAt))
+          : "Unconfirmed"}
+      </span>
+      <span className="font-mono text-[11px] text-muted-foreground">
+        {item.createUtxoSignaturePreview}
+      </span>
+    </button>
+  );
+}
+
 export function AuditorPortal({
   initialToken,
   initialTokenDecodeFailed = false,
@@ -377,6 +422,19 @@ export function AuditorPortal({
   );
   const [isLoading, setIsLoading] = useState(false);
   const [evidence, setEvidence] = useState<AuditorEvidenceResponse | null>(null);
+  const [evidenceIndexItems, setEvidenceIndexItems] = useState<
+    AuditorEvidenceIndexItem[]
+  >([]);
+  const [isEvidenceIndexLoading, setIsEvidenceIndexLoading] = useState(false);
+  const [evidenceIndexError, setEvidenceIndexError] = useState<string | null>(
+    null,
+  );
+  const [selectedEvidenceSignature, setSelectedEvidenceSignature] =
+    useState("");
+  const [evidenceCache, setEvidenceCache] = useState<
+    Record<string, AuditorEvidenceResponse>
+  >({});
+  const evidenceCacheRef = useRef<Record<string, AuditorEvidenceResponse>>({});
   const runtimeConfig = useMemo(() => getUmbraRuntimeConfig(), []);
   const requiredAuditorRegistrationSol =
     UMBRA_COST_ESTIMATE_LAMPORTS.auditorRegistration;
@@ -444,6 +502,10 @@ export function AuditorPortal({
     tokenAuditorAddress: parsedGateToken?.auditorAddress ?? null,
     walletsReady,
   });
+
+  useEffect(() => {
+    evidenceCacheRef.current = evidenceCache;
+  }, [evidenceCache]);
 
   const refreshRegistrationStatus = useCallback(async () => {
     if (!wallet) return;
@@ -573,6 +635,97 @@ export function AuditorPortal({
     });
   }
 
+  const loadEvidenceForSignature = useCallback(
+    async (token: GrantTokenPayload, signature: string) => {
+      setError(null);
+      setSelectedEvidenceSignature(signature);
+
+      const cached = evidenceCacheRef.current[signature];
+      if (cached) {
+        setEvidence(cached);
+        return;
+      }
+
+      setIsLoading(true);
+      setEvidence(null);
+
+      try {
+        const next = await fetchEvidenceForToken(
+          {
+            token,
+            txSignature: signature,
+          },
+          getAccessToken,
+        );
+        setEvidence(next);
+        setEvidenceCache((current) => ({
+          ...current,
+          [signature]: next,
+        }));
+      } catch (err) {
+        const code = err instanceof ApiClientError ? err.code : undefined;
+        const message =
+          err instanceof Error ? err.message : "Unable to load evidence.";
+        setError({ message, code });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [getAccessToken],
+  );
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    if (!gateState.canShowDecryptForm || !parsedGateToken) {
+      setEvidenceIndexItems([]);
+      setEvidenceIndexError(null);
+      setSelectedEvidenceSignature("");
+      setEvidence(null);
+      evidenceCacheRef.current = {};
+      setEvidenceCache({});
+      return;
+    }
+
+    setIsEvidenceIndexLoading(true);
+    setEvidenceIndexError(null);
+
+    void fetchEvidenceIndexForToken({ token: parsedGateToken }, getAccessToken)
+      .then((items) => {
+        if (!isCurrent) return;
+        setEvidenceIndexItems(items);
+        evidenceCacheRef.current = {};
+        setEvidenceCache({});
+        setEvidence(null);
+        const firstSignature = items[0]?.createUtxoSignature ?? "";
+        setSelectedEvidenceSignature(firstSignature);
+        if (firstSignature) {
+          void loadEvidenceForSignature(parsedGateToken, firstSignature);
+        }
+      })
+      .catch((err) => {
+        if (!isCurrent) return;
+        const message =
+          err instanceof Error
+            ? err.message
+            : "Unable to load scoped evidence for this grant.";
+        setEvidenceIndexError(message);
+      })
+      .finally(() => {
+        if (!isCurrent) return;
+        setIsEvidenceIndexLoading(false);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [
+    gateState.canShowDecryptForm,
+    getAccessToken,
+    loadEvidenceForSignature,
+    parsedGateToken,
+  ]);
+
   async function handleRegister() {
     if (!wallet) {
       toast.error("Connect your Solana wallet first.");
@@ -624,8 +777,6 @@ export function AuditorPortal({
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
-    setIsLoading(true);
-    setEvidence(null);
 
     try {
       let parsedToken: GrantTokenPayload;
@@ -641,18 +792,12 @@ export function AuditorPortal({
       }
 
       const sig = parseTxSignature(txSignature.trim());
-      const next = await fetchEvidenceForToken({
-        token: parsedToken,
-        txSignature: sig,
-      }, getAccessToken);
-      setEvidence(next);
+      await loadEvidenceForSignature(parsedToken, sig);
     } catch (err) {
       const code = err instanceof ApiClientError ? err.code : undefined;
       const message =
         err instanceof Error ? err.message : "Unable to load evidence.";
       setError({ message, code });
-    } finally {
-      setIsLoading(false);
     }
   }
 
@@ -890,95 +1035,169 @@ export function AuditorPortal({
         )}
 
         {gateState.canShowDecryptForm && (
-        <Card className="border-card-border">
-          <CardHeader>
-            <CardTitle className="font-serif text-lg">Decrypt invoice</CardTitle>
-            <CardDescription>
-              The merchant sent you a grant link or token. Paste the transaction
-              signature you want to verify.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="grant-json">Grant token (JSON)</Label>
-                <Textarea
-                  id="grant-json"
-                  value={grantJson}
-                  onChange={(event) => {
-                    setGrantJson(event.target.value);
-                    setError(null);
-                  }}
-                  rows={8}
-                  placeholder='{"v":1,"grantId":"...","granterAddress":"...","auditorAddress":"..."}'
-                  className="font-mono text-xs"
-                  disabled={isLoading}
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="tx-signature">Transaction signature</Label>
-                <Input
-                  id="tx-signature"
-                  value={txSignature}
-                  onChange={(event) => {
-                    setTxSignature(event.target.value);
-                    setError(null);
-                  }}
-                  placeholder="Solana transaction signature (base58)"
-                  className="font-mono text-xs"
-                  disabled={isLoading}
-                  spellCheck={false}
-                  autoComplete="off"
-                />
-              </div>
-
-              {error && (
-                <div
-                  className={cn(
-                    "flex items-start gap-2 rounded-md border px-3 py-2 text-sm",
-                    error.code === "grant_revoked"
-                      ? "border-[var(--status-overdue)]/30 bg-[var(--status-overdue-bg)] text-[var(--status-overdue)]"
-                      : "border-destructive/20 bg-[var(--status-overdue-bg)] text-destructive",
-                  )}
-                >
-                  {error.code === "grant_revoked" ? (
-                    <ShieldOff className="mt-0.5 size-4 shrink-0" />
-                  ) : (
-                    <XCircle className="mt-0.5 size-4 shrink-0" />
-                  )}
-                  <span>{error.message}</span>
-                </div>
-              )}
-
-              <div className="flex items-center gap-2">
-                <Button
-                  type="submit"
-                  disabled={
-                    isLoading ||
-                    grantJson.trim().length === 0 ||
-                    txSignature.trim().length === 0
-                  }
-                >
-                  {isLoading ? (
+          <div className="flex flex-col gap-4">
+            <Card className="border-card-border">
+              <CardHeader>
+                <CardTitle className="font-serif text-lg">
+                  Granted evidence
+                </CardTitle>
+                <CardDescription>
+                  Review the invoices and on-chain transactions the merchant
+                  included in this grant.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                {isEvidenceIndexLoading && (
+                  <div className="flex items-center gap-2 rounded-md border border-border bg-muted/10 px-3 py-3 text-sm text-muted-foreground">
                     <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Sparkles className="size-4" />
-                  )}
-                  Decrypt invoice
-                </Button>
-                {evidence && (
-                  <Button type="button" variant="ghost" onClick={reset}>
-                    Clear
-                  </Button>
+                    Loading scoped evidence...
+                  </div>
                 )}
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-        )}
 
-        {evidence && <EvidenceView evidence={evidence} />}
+                {evidenceIndexError && (
+                  <div className="flex items-start gap-2 rounded-md border border-destructive/20 bg-[var(--status-overdue-bg)] px-3 py-2 text-sm text-destructive">
+                    <XCircle className="mt-0.5 size-4 shrink-0" />
+                    <span>{evidenceIndexError}</span>
+                  </div>
+                )}
+
+                {!isEvidenceIndexLoading &&
+                  !evidenceIndexError &&
+                  evidenceIndexItems.length === 0 && (
+                    <div className="rounded-md border border-dashed border-border bg-muted/10 px-4 py-8 text-sm text-muted-foreground">
+                      This grant does not currently include any confirmed Umbra
+                      payment evidence.
+                    </div>
+                  )}
+
+                {evidenceIndexItems.length > 0 && (
+                  <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+                    <div className="flex max-h-[520px] flex-col gap-2 overflow-y-auto">
+                      {evidenceIndexItems.map((item) => (
+                        <EvidenceIndexButton
+                          key={item.createUtxoSignature}
+                          item={item}
+                          isSelected={
+                            selectedEvidenceSignature ===
+                            item.createUtxoSignature
+                          }
+                          onSelect={() => {
+                            if (!parsedGateToken) return;
+                            void loadEvidenceForSignature(
+                              parsedGateToken,
+                              item.createUtxoSignature,
+                            );
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    <div className="min-w-0">
+                      {isLoading && (
+                        <div className="flex items-center gap-2 rounded-md border border-border bg-muted/10 px-3 py-3 text-sm text-muted-foreground">
+                          <Loader2 className="size-4 animate-spin" />
+                          Loading invoice evidence...
+                        </div>
+                      )}
+                      {!isLoading && evidence && (
+                        <EvidenceView evidence={evidence} />
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-card-border">
+              <CardHeader>
+                <CardTitle className="font-serif text-lg">
+                  Advanced signature lookup
+                </CardTitle>
+                <CardDescription>
+                  Paste a UTXO signature manually. The request is still limited
+                  to this grant's scope.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="grant-json">Grant token (JSON)</Label>
+                    <Textarea
+                      id="grant-json"
+                      value={grantJson}
+                      onChange={(event) => {
+                        setGrantJson(event.target.value);
+                        setError(null);
+                      }}
+                      rows={5}
+                      placeholder='{"v":1,"grantId":"...","granterAddress":"...","auditorAddress":"..."}'
+                      className="font-mono text-xs"
+                      disabled={isLoading}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="tx-signature">Transaction signature</Label>
+                    <Input
+                      id="tx-signature"
+                      value={txSignature}
+                      onChange={(event) => {
+                        setTxSignature(event.target.value);
+                        setError(null);
+                      }}
+                      placeholder="Solana transaction signature (base58)"
+                      className="font-mono text-xs"
+                      disabled={isLoading}
+                      spellCheck={false}
+                      autoComplete="off"
+                    />
+                  </div>
+
+                  {error && (
+                    <div
+                      className={cn(
+                        "flex items-start gap-2 rounded-md border px-3 py-2 text-sm",
+                        error.code === "grant_revoked"
+                          ? "border-[var(--status-overdue)]/30 bg-[var(--status-overdue-bg)] text-[var(--status-overdue)]"
+                          : "border-destructive/20 bg-[var(--status-overdue-bg)] text-destructive",
+                      )}
+                    >
+                      {error.code === "grant_revoked" ? (
+                        <ShieldOff className="mt-0.5 size-4 shrink-0" />
+                      ) : (
+                        <XCircle className="mt-0.5 size-4 shrink-0" />
+                      )}
+                      <span>{error.message}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="submit"
+                      disabled={
+                        isLoading ||
+                        grantJson.trim().length === 0 ||
+                        txSignature.trim().length === 0
+                      }
+                    >
+                      {isLoading ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="size-4" />
+                      )}
+                      Load signature
+                    </Button>
+                    {evidence && (
+                      <Button type="button" variant="ghost" onClick={reset}>
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         <footer className="mt-4 flex items-center justify-between border-t border-card-border pt-4 text-xs text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">

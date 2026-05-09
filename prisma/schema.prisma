@@ -97,6 +97,7 @@ model ComplianceGrant {
   grantNonce          String
   issuanceSignature   String
   invoiceScopeIds     String[]        @default([])
+  paymentScopeSignatures String[]     @default([])
   label               String?
   grantedAt           DateTime        @default(now())
   revokedAt           DateTime?

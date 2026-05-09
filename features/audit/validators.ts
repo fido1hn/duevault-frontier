@@ -53,6 +53,34 @@ function assertNonceString(value: string, field: string) {
   }
 }
 
+function parseStringArray(
+  value: unknown,
+  field: string,
+  validate?: (entry: string, field: string) => void,
+) {
+  if (value === undefined) {
+    return [];
+  }
+
+  if (!Array.isArray(value)) {
+    throw new AuditValidationError(`${field} must be an array.`);
+  }
+
+  return Array.from(
+    new Set(
+      value.map((entry, index) => {
+        if (typeof entry !== "string" || entry.length === 0) {
+          throw new AuditValidationError(
+            `${field}[${index}] must be a non-empty string.`,
+          );
+        }
+        validate?.(entry, `${field}[${index}]`);
+        return entry;
+      }),
+    ),
+  );
+}
+
 export function parseGrantTokenPayload(value: unknown): GrantTokenPayload {
   if (!value || typeof value !== "object") {
     throw new AuditValidationError("Grant token payload is missing.");
@@ -111,25 +139,25 @@ export function parseIssueGrantInput(value: unknown): IssueGrantInput {
     label = trimmed.length > 0 ? trimmed : null;
   }
 
-  let invoiceScopeIds: string[] = [];
-  if (candidate.invoiceScopeIds !== undefined) {
-    if (!Array.isArray(candidate.invoiceScopeIds)) {
-      throw new AuditValidationError("invoiceScopeIds must be an array.");
-    }
-    invoiceScopeIds = candidate.invoiceScopeIds.map((entry, index) => {
-      if (typeof entry !== "string" || entry.length === 0) {
-        throw new AuditValidationError(
-          `invoiceScopeIds[${index}] must be a non-empty string.`,
-        );
+  const invoiceScopeIds = parseStringArray(
+    candidate.invoiceScopeIds,
+    "invoiceScopeIds",
+  );
+  const paymentScopeSignatures = parseStringArray(
+    candidate.paymentScopeSignatures,
+    "paymentScopeSignatures",
+    (entry, field) => {
+      if (!TX_SIGNATURE_REGEX.test(entry)) {
+        throw new AuditValidationError(`${field} is not valid base58.`);
       }
-      return entry;
-    });
-  }
+    },
+  );
 
   return {
     auditorAddress: candidate.auditorAddress,
     label,
     invoiceScopeIds,
+    paymentScopeSignatures,
   };
 }
 
@@ -177,20 +205,19 @@ export function parsePersistIssuedGrantInput(
     label = trimmed.length > 0 ? trimmed : null;
   }
 
-  let invoiceScopeIds: string[] = [];
-  if (candidate.invoiceScopeIds !== undefined) {
-    if (!Array.isArray(candidate.invoiceScopeIds)) {
-      throw new AuditValidationError("invoiceScopeIds must be an array.");
-    }
-    invoiceScopeIds = candidate.invoiceScopeIds.map((entry, index) => {
-      if (typeof entry !== "string" || entry.length === 0) {
-        throw new AuditValidationError(
-          `invoiceScopeIds[${index}] must be a non-empty string.`,
-        );
+  const invoiceScopeIds = parseStringArray(
+    candidate.invoiceScopeIds,
+    "invoiceScopeIds",
+  );
+  const paymentScopeSignatures = parseStringArray(
+    candidate.paymentScopeSignatures,
+    "paymentScopeSignatures",
+    (entry, field) => {
+      if (!TX_SIGNATURE_REGEX.test(entry)) {
+        throw new AuditValidationError(`${field} is not valid base58.`);
       }
-      return entry;
-    });
-  }
+    },
+  );
 
   return {
     granterAddress: candidate.granterAddress,
@@ -200,6 +227,7 @@ export function parsePersistIssuedGrantInput(
     grantNonce: candidate.grantNonce,
     issuanceSignature: candidate.issuanceSignature,
     invoiceScopeIds,
+    paymentScopeSignatures,
     label,
   };
 }

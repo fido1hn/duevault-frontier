@@ -11,6 +11,7 @@ export type CreateComplianceGrantInput = {
   grantNonce: string;
   issuanceSignature: string;
   invoiceScopeIds: string[];
+  paymentScopeSignatures: string[];
   label: string | null;
 };
 
@@ -27,6 +28,7 @@ export async function createComplianceGrantRecord(
       grantNonce: input.grantNonce,
       issuanceSignature: input.issuanceSignature,
       invoiceScopeIds: input.invoiceScopeIds,
+      paymentScopeSignatures: input.paymentScopeSignatures,
       label: input.label,
     },
   });

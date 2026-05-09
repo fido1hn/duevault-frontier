@@ -15,6 +15,7 @@ import {
   markComplianceGrantRevoked,
 } from "@/features/audit/repository";
 import type {
+  AuditorEvidenceIndexItem,
   AuditorEvidenceResponse,
   GrantTokenPayload,
   PersistIssuedGrantInput,
@@ -38,6 +39,10 @@ export type IssuedGrantResult = {
   token: GrantTokenPayload;
 };
 
+function previewSignature(signature: string) {
+  return `${signature.slice(0, 8)}...${signature.slice(-8)}`;
+}
+
 export async function persistIssuedGrantForMerchant(
   merchantProfileId: string,
   expectedGranterAddress: string,
@@ -60,6 +65,7 @@ export async function persistIssuedGrantForMerchant(
     grantNonce: input.grantNonce,
     issuanceSignature: input.issuanceSignature,
     invoiceScopeIds: input.invoiceScopeIds,
+    paymentScopeSignatures: input.paymentScopeSignatures,
     label: input.label,
   });
 
@@ -165,7 +171,23 @@ export async function loadEvidenceForToken(
     );
   }
 
+  const paymentScopeSignatures =
+    (grant as typeof grant & { paymentScopeSignatures?: string[] })
+      .paymentScopeSignatures ?? [];
+
   if (
+    paymentScopeSignatures.length > 0 &&
+    !paymentScopeSignatures.includes(payment.createUtxoSignature)
+  ) {
+    throw new AuditServiceError(
+      "This transaction is outside the grant scope.",
+      "payment_out_of_scope",
+      403,
+    );
+  }
+
+  if (
+    paymentScopeSignatures.length === 0 &&
     grant.invoiceScopeIds.length > 0 &&
     !grant.invoiceScopeIds.includes(payment.invoiceId)
   ) {
@@ -217,4 +239,70 @@ export async function loadEvidenceForToken(
       merchantBusinessName: payment.merchantProfile.businessName,
     },
   };
+}
+
+export async function loadEvidenceIndexForToken(
+  token: GrantTokenPayload,
+): Promise<AuditorEvidenceIndexItem[]> {
+  const grant = await findComplianceGrantById(token.grantId);
+
+  if (!grant || !tokenMatchesGrant(token, grant)) {
+    throw new AuditServiceError(
+      "This grant token is malformed.",
+      "grant_invalid",
+      400,
+    );
+  }
+
+  if (grant.revokedAt) {
+    throw new AuditServiceError(
+      "This grant has been revoked by the merchant.",
+      "grant_revoked",
+      403,
+    );
+  }
+
+  const paymentScopeSignatures =
+    (grant as typeof grant & { paymentScopeSignatures?: string[] })
+      .paymentScopeSignatures ?? [];
+  const where =
+    paymentScopeSignatures.length > 0
+      ? {
+          merchantProfileId: grant.merchantProfileId,
+          status: "confirmed",
+          createUtxoSignature: { in: paymentScopeSignatures },
+        }
+      : {
+          merchantProfileId: grant.merchantProfileId,
+          status: "confirmed",
+          ...(grant.invoiceScopeIds.length > 0
+            ? { invoiceId: { in: grant.invoiceScopeIds } }
+            : {}),
+        };
+
+  const payments = await db.umbraInvoicePayment.findMany({
+    where,
+    include: {
+      invoice: true,
+    },
+    orderBy: [{ confirmedAt: "desc" }, { createdAt: "desc" }],
+  });
+
+  return payments.map((payment) => ({
+    id: payment.id,
+    invoiceId: payment.invoiceId,
+    invoiceNumber: payment.invoice.invoiceNumber,
+    client: payment.invoice.customerName,
+    clientEmail: payment.invoice.customerEmail,
+    issuedAt: payment.invoice.issuedAt.toISOString(),
+    dueAt: payment.invoice.dueAt.toISOString(),
+    totalAmountAtomic: payment.invoice.totalAmountAtomic,
+    amountAtomic: payment.amountAtomic,
+    mint: payment.mint,
+    network: payment.network as AuditorEvidenceIndexItem["network"],
+    status: payment.status as AuditorEvidenceIndexItem["status"],
+    confirmedAt: payment.confirmedAt ? payment.confirmedAt.toISOString() : null,
+    createUtxoSignature: payment.createUtxoSignature,
+    createUtxoSignaturePreview: previewSignature(payment.createUtxoSignature),
+  }));
 }

@@ -6,6 +6,7 @@ import { useStandardWallets } from "@privy-io/react-auth/solana";
 import {
   Check,
   Copy,
+  CalendarDays,
   Loader2,
   Plus,
   Shield,
@@ -37,10 +38,17 @@ import {
   useIssueGrantMutation,
   useRevokeGrantMutation,
 } from "@/features/audit/queries";
+import {
+  applyComplianceScopePreset,
+  buildComplianceScopeSummary,
+  getGrantableInvoicePayments,
+  toggleInvoicePaymentScope,
+} from "@/features/audit/scope-selection";
 import type {
   GrantTokenPayload,
   SerializedComplianceGrant,
 } from "@/features/audit/types";
+import { useInvoicesQuery } from "@/features/invoices/queries";
 import { createPrivyUmbraSigner } from "@/features/checkout/privy-umbra-signer";
 import { createMerchantWalletMasterSeedStorage } from "@/features/wallet/merchant-wallet-actions";
 import { usePrivyUmbraSigner } from "@/hooks/use-privy-umbra-signer";
@@ -55,6 +63,10 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
 });
 
 const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+const amountFormatter = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 6,
+});
 
 type IssuedResult = {
   grant: SerializedComplianceGrant;
@@ -119,6 +131,7 @@ export default function CompliancePage() {
     profile.walletAddress,
   );
   const grantsQuery = useGrantsQuery();
+  const invoicesQuery = useInvoicesQuery();
   const issueMutation = useIssueGrantMutation();
   const revokeMutation = useRevokeGrantMutation();
 
@@ -130,6 +143,9 @@ export default function CompliancePage() {
   const [showIssueForm, setShowIssueForm] = useState(false);
   const [auditorAddress, setAuditorAddress] = useState("");
   const [label, setLabel] = useState("");
+  const [selectedPaymentSignatures, setSelectedPaymentSignatures] = useState<
+    string[]
+  >([]);
   const [issueError, setIssueError] = useState("");
   const [issuedResult, setIssuedResult] = useState<IssuedResult | null>(null);
   const [revokeConfirmId, setRevokeConfirmId] = useState<string | null>(null);
@@ -141,6 +157,18 @@ export default function CompliancePage() {
     standardWallets.ready && Boolean(wallet) && isUmbraReady;
 
   const grants = grantsQuery.data ?? [];
+  const grantablePayments = useMemo(
+    () => getGrantableInvoicePayments(invoicesQuery.data ?? []),
+    [invoicesQuery.data],
+  );
+  const scopeSummary = useMemo(
+    () =>
+      buildComplianceScopeSummary(
+        grantablePayments,
+        selectedPaymentSignatures,
+      ),
+    [grantablePayments, selectedPaymentSignatures],
+  );
   const grantsError = grantsQuery.isError
     ? grantsQuery.error instanceof Error
       ? grantsQuery.error.message
@@ -168,6 +196,7 @@ export default function CompliancePage() {
     setShowIssueForm(false);
     setAuditorAddress("");
     setLabel("");
+    setSelectedPaymentSignatures([]);
     setIssueError("");
     setIssuedResult(null);
   }
@@ -190,6 +219,13 @@ export default function CompliancePage() {
       return;
     }
 
+    if (selectedPaymentSignatures.length === 0) {
+      const msg = "Select at least one confirmed Umbra payment to share.";
+      setIssueError(msg);
+      toast.error(msg);
+      return;
+    }
+
     const config = buildConfig();
     if (!config) {
       const msg = "Connect the Solana wallet attached to this merchant profile.";
@@ -205,11 +241,13 @@ export default function CompliancePage() {
           granterAddress: profile.umbraWalletAddress,
           auditorAddress: trimmedAuditor,
           label: label.trim() || null,
+          paymentScopeSignatures: selectedPaymentSignatures,
         },
       });
       setIssuedResult(result);
       setAuditorAddress("");
       setLabel("");
+      setSelectedPaymentSignatures([]);
       toast.success("Compliance grant issued.");
     } catch (error) {
       const message =
@@ -253,6 +291,13 @@ export default function CompliancePage() {
   const auditorPortalUrl = issuedResult
     ? buildAuditorPortalUrl(portalOrigin, issuedResult.token)
     : "";
+
+  function applyPreset(preset: "last_30_days" | "last_month") {
+    setSelectedPaymentSignatures(
+      applyComplianceScopePreset(preset, grantablePayments),
+    );
+    setIssueError("");
+  }
 
   return (
     <div className="flex flex-col gap-8 px-4 py-6 md:px-8 md:py-10">
@@ -354,6 +399,172 @@ export default function CompliancePage() {
                   disabled={issueMutation.isPending}
                   maxLength={120}
                 />
+              </div>
+
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <Label>Evidence scope</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Select invoices to share. DueVault stores the exact confirmed
+                    Umbra transaction signatures in the grant.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="bg-card"
+                    disabled={issueMutation.isPending || grantablePayments.length === 0}
+                    onClick={() => applyPreset("last_30_days")}
+                  >
+                    <CalendarDays className="size-4" />
+                    Last 30 days
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="bg-card"
+                    disabled={issueMutation.isPending || grantablePayments.length === 0}
+                    onClick={() => applyPreset("last_month")}
+                  >
+                    <CalendarDays className="size-4" />
+                    Last month
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={
+                      issueMutation.isPending ||
+                      selectedPaymentSignatures.length === 0
+                    }
+                    onClick={() => setSelectedPaymentSignatures([])}
+                  >
+                    Clear
+                  </Button>
+                </div>
+
+                {invoicesQuery.isPending && (
+                  <div className="flex items-center gap-2 rounded-md border border-border bg-muted/10 px-3 py-2 text-sm text-muted-foreground">
+                    <Loader2 className="size-4 animate-spin" />
+                    Loading confirmed Umbra payments...
+                  </div>
+                )}
+
+                {!invoicesQuery.isPending && grantablePayments.length === 0 && (
+                  <div className="rounded-md border border-dashed border-border bg-muted/10 px-3 py-4 text-sm text-muted-foreground">
+                    No confirmed Umbra payments are ready to grant yet.
+                  </div>
+                )}
+
+                {grantablePayments.length > 0 && (
+                  <div className="max-h-72 overflow-y-auto rounded-md border border-border">
+                    <ul className="divide-y divide-border">
+                      {grantablePayments.map((payment) => {
+                        const isSelected = selectedPaymentSignatures.includes(
+                          payment.createUtxoSignature,
+                        );
+
+                        return (
+                          <li key={payment.createUtxoSignature}>
+                            <button
+                              type="button"
+                              disabled={issueMutation.isPending}
+                              onClick={() => {
+                                setSelectedPaymentSignatures((current) =>
+                                  toggleInvoicePaymentScope(current, payment),
+                                );
+                                setIssueError("");
+                              }}
+                              className={cn(
+                                "flex w-full items-start gap-3 px-3 py-3 text-left transition-colors hover:bg-muted/30",
+                                isSelected && "bg-primary/5",
+                              )}
+                            >
+                              <span
+                                className={cn(
+                                  "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border",
+                                  isSelected
+                                    ? "border-primary bg-primary text-primary-foreground"
+                                    : "border-border bg-card",
+                                )}
+                              >
+                                {isSelected && <Check className="size-3" />}
+                              </span>
+                              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                                <span className="flex flex-wrap items-center gap-2">
+                                  <span className="font-medium text-foreground">
+                                    {payment.invoiceNumber}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {payment.client}
+                                  </span>
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  Confirmed{" "}
+                                  {dateFormatter.format(
+                                    new Date(payment.confirmedAt),
+                                  )}{" "}
+                                  · {amountFormatter.format(payment.amountNumber)}{" "}
+                                  {payment.mint}
+                                </span>
+                                <span className="font-mono text-[11px] text-muted-foreground">
+                                  {truncateMiddle(payment.createUtxoSignature)}
+                                </span>
+                              </span>
+                            </button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+
+                {scopeSummary.transactionCount > 0 && (
+                  <div className="grid gap-3 rounded-md border border-border bg-muted/10 p-3 text-sm md:grid-cols-4">
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                        Invoices
+                      </p>
+                      <p className="font-medium text-foreground">
+                        {scopeSummary.invoiceCount}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                        Transactions
+                      </p>
+                      <p className="font-medium text-foreground">
+                        {scopeSummary.transactionCount}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                        Total
+                      </p>
+                      <p className="font-medium text-foreground">
+                        {amountFormatter.format(scopeSummary.totalAmountNumber)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground">
+                        Dates
+                      </p>
+                      <p className="font-medium text-foreground">
+                        {scopeSummary.startDate && scopeSummary.endDate
+                          ? `${dateFormatter.format(
+                              new Date(scopeSummary.startDate),
+                            )} - ${dateFormatter.format(
+                              new Date(scopeSummary.endDate),
+                            )}`
+                          : "None"}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {issueError && (

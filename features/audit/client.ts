@@ -10,6 +10,7 @@ import {
 } from "@/features/audit/mappers";
 import type {
   AuditorEvidenceResponse,
+  AuditorEvidenceIndexItem,
   GrantTokenPayload,
   IssueGrantInput,
   PersistIssuedGrantInput,
@@ -47,6 +48,12 @@ type IssuedGrantResponse = {
 
 type EvidenceResponse = {
   evidence?: AuditorEvidenceResponse;
+  error?: string;
+  code?: string;
+};
+
+type EvidenceIndexResponse = {
+  items?: AuditorEvidenceIndexItem[];
   error?: string;
   code?: string;
 };
@@ -115,10 +122,41 @@ export async function issueAndPersistGrant(
       grantNonce: (sdkGrant.nonce as unknown as bigint).toString(),
       issuanceSignature: sdkGrant.signature as unknown as string,
       invoiceScopeIds: input.invoiceScopeIds ?? [],
+      paymentScopeSignatures: input.paymentScopeSignatures ?? [],
       label: input.label ?? null,
     },
     getAuthToken,
   );
+}
+
+export async function fetchEvidenceIndexForToken(
+  args: {
+    token: GrantTokenPayload;
+  },
+  getAuthToken: GetAuthToken,
+) {
+  const response = await authenticatedFetch(
+    "/api/audit/evidence-index",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(args),
+      cache: "no-store",
+    },
+    getAuthToken,
+  );
+  const payload = (await response.json()) as EvidenceIndexResponse;
+
+  if (!response.ok || !payload.items) {
+    throw createApiClientError(
+      response,
+      "Unable to load evidence for this grant.",
+      payload.error,
+      payload.code,
+    );
+  }
+
+  return payload.items;
 }
 
 export async function revokeAndPersistGrant(

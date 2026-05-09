@@ -44,6 +44,7 @@ function validInput(overrides = {}) {
     grantNonce: "1234567890",
     issuanceSignature: "5".repeat(80),
     invoiceScopeIds: [],
+    paymentScopeSignatures: [],
     label: "Q4 2025 — KPMG",
     ...overrides,
   };
@@ -60,6 +61,7 @@ function dbRecord(overrides = {}) {
     grantNonce: "1234567890",
     issuanceSignature: "5".repeat(80),
     invoiceScopeIds: [],
+    paymentScopeSignatures: [],
     label: "Q4 2025 — KPMG",
     grantedAt: new Date("2026-05-08T10:00:00.000Z"),
     revokedAt: null,
@@ -100,6 +102,7 @@ describe("persistIssuedGrantForMerchant", () => {
           grantNonce: data.grantNonce,
           issuanceSignature: data.issuanceSignature,
           invoiceScopeIds: data.invoiceScopeIds,
+          paymentScopeSignatures: data.paymentScopeSignatures,
           label: data.label,
         }),
       ),
@@ -121,6 +124,7 @@ describe("persistIssuedGrantForMerchant", () => {
     expect(createCall.data.grantNonce).toBe("1234567890");
     expect(createCall.data.label).toBe("Q4 2025 — KPMG");
     expect(createCall.data.invoiceScopeIds).toEqual([]);
+    expect(createCall.data.paymentScopeSignatures).toEqual([]);
 
     expect(result.grant.id).toBe("grant_1");
     expect(result.grant.status).toBe("active");
@@ -132,6 +136,42 @@ describe("persistIssuedGrantForMerchant", () => {
     expect(result.token.granterAddress).toBe(GRANTER_ADDRESS);
     expect(result.token.auditorAddress).toBe(AUDITOR_ADDRESS);
     expect(result.token.grantNonce).toBe("1234567890");
+  });
+
+  test("persists selected payment signature scope", async () => {
+    fakeDb.complianceGrant.create.mockReset();
+    fakeDb.complianceGrant.create.mockImplementation(({ data }) =>
+      Promise.resolve(
+        dbRecord({
+          merchantProfileId: data.merchantProfileId,
+          granterAddress: data.granterAddress,
+          auditorAddress: data.auditorAddress,
+          granterX25519: data.granterX25519,
+          auditorX25519: data.auditorX25519,
+          grantNonce: data.grantNonce,
+          issuanceSignature: data.issuanceSignature,
+          invoiceScopeIds: data.invoiceScopeIds,
+          paymentScopeSignatures: data.paymentScopeSignatures,
+          label: data.label,
+        }),
+      ),
+    );
+
+    const result = await persistIssuedGrantForMerchant(
+      MERCHANT_ID,
+      GRANTER_ADDRESS,
+      validInput({ paymentScopeSignatures: ["s".repeat(80), "t".repeat(80)] }),
+    );
+
+    const createCall = fakeDb.complianceGrant.create.mock.calls[0][0];
+    expect(createCall.data.paymentScopeSignatures).toEqual([
+      "s".repeat(80),
+      "t".repeat(80),
+    ]);
+    expect(result.grant.paymentScopeSignatures).toEqual([
+      "s".repeat(80),
+      "t".repeat(80),
+    ]);
   });
 });
 

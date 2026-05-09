@@ -15,6 +15,7 @@ export type SerializedComplianceGrant = {
   grantNonce: string;
   issuanceSignature: string;
   invoiceScopeIds: string[];
+  paymentScopeSignatures: string[];
   label: string | null;
   status: ComplianceGrantStatus;
   grantedAt: string;
@@ -39,6 +40,7 @@ export type IssueGrantInput = {
   auditorAddress: string;
   label?: string | null;
   invoiceScopeIds?: string[];
+  paymentScopeSignatures?: string[];
 };
 
 export type PersistIssuedGrantInput = {
@@ -49,7 +51,26 @@ export type PersistIssuedGrantInput = {
   grantNonce: string;
   issuanceSignature: string;
   invoiceScopeIds: string[];
+  paymentScopeSignatures: string[];
   label: string | null;
+};
+
+export type AuditorEvidenceIndexItem = {
+  id: string;
+  invoiceId: string;
+  invoiceNumber: string;
+  client: string;
+  clientEmail: string;
+  issuedAt: string;
+  dueAt: string;
+  totalAmountAtomic: string;
+  amountAtomic: string;
+  mint: string;
+  network: SerializedUmbraInvoicePayment["network"];
+  status: SerializedUmbraInvoicePayment["status"];
+  confirmedAt: string | null;
+  createUtxoSignature: string;
+  createUtxoSignaturePreview: string;
 };
 
 export type AuditorInvoiceLineItem = {

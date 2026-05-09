@@ -20,6 +20,10 @@ export function base58ToBytes(value: string): Uint8Array {
 export function serializeComplianceGrant(
   record: ComplianceGrant,
 ): SerializedComplianceGrant {
+  const recordWithPaymentScope = record as ComplianceGrant & {
+    paymentScopeSignatures?: string[];
+  };
+
   return {
     id: record.id,
     merchantProfileId: record.merchantProfileId,
@@ -30,6 +34,7 @@ export function serializeComplianceGrant(
     grantNonce: record.grantNonce,
     issuanceSignature: record.issuanceSignature,
     invoiceScopeIds: record.invoiceScopeIds,
+    paymentScopeSignatures: recordWithPaymentScope.paymentScopeSignatures ?? [],
     label: record.label,
     status: record.revokedAt ? "revoked" : "active",
     grantedAt: record.grantedAt.toISOString(),

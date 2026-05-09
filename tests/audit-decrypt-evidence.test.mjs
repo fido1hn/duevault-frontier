@@ -64,6 +64,7 @@ function grantRecord(overrides = {}) {
     grantNonce: NONCE,
     issuanceSignature: "i".repeat(80),
     invoiceScopeIds: [],
+    paymentScopeSignatures: [],
     label: "Q4 2025",
     grantedAt: new Date("2026-05-08T10:00:00.000Z"),
     revokedAt: null,
@@ -242,6 +243,36 @@ describe("loadEvidenceForToken", () => {
 
     expect(caught.code).toBe("invoice_out_of_scope");
     expect(caught.status).toBe(403);
+  });
+
+  test("rejects with payment_out_of_scope when payment signature scope excludes the transaction", async () => {
+    resetMocks();
+    fakeDb.complianceGrant.findUnique.mockResolvedValueOnce(
+      grantRecord({ paymentScopeSignatures: ["v".repeat(80)] }),
+    );
+    fakeDb.umbraInvoicePayment.findUnique.mockResolvedValueOnce(paymentRecord());
+
+    let caught;
+    try {
+      await loadEvidenceForToken(validToken(), TX_SIG);
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(AuditServiceError);
+    expect(caught.code).toBe("payment_out_of_scope");
+    expect(caught.status).toBe(403);
+  });
+
+  test("returns evidence when payment signature scope includes the transaction", async () => {
+    resetMocks();
+    fakeDb.complianceGrant.findUnique.mockResolvedValueOnce(
+      grantRecord({ paymentScopeSignatures: [TX_SIG] }),
+    );
+    fakeDb.umbraInvoicePayment.findUnique.mockResolvedValueOnce(paymentRecord());
+
+    const evidence = await loadEvidenceForToken(validToken(), TX_SIG);
+    expect(evidence.payment.createUtxoSignature).toBe(TX_SIG);
   });
 
   test("returns full evidence with line items on a valid request", async () => {
