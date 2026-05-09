@@ -13,7 +13,6 @@ import {
   Lock,
   Shield,
   ShieldOff,
-  Sparkles,
   Wallet,
   XCircle,
 } from "lucide-react";
@@ -28,9 +27,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   getAuditorGateState,
   getAuditorRegistrationFundingState,
@@ -50,11 +47,6 @@ import type {
   AuditorEvidenceResponse,
   GrantTokenPayload,
 } from "@/features/audit/types";
-import {
-  AuditValidationError,
-  parseGrantTokenPayload,
-  parseTxSignature,
-} from "@/features/audit/validators";
 import {
   getLinkedSolanaWallets,
   SOLANA_WALLET_LIST,
@@ -404,18 +396,12 @@ export function AuditorPortal({
     ready: privyReady,
     user,
   } = usePrivy();
-  const initialTokenJson = useMemo(
-    () => (initialToken ? JSON.stringify(initialToken, null, 2) : ""),
-    [initialToken],
-  );
-  const [grantJson, setGrantJson] = useState(initialTokenJson);
-  const [txSignature, setTxSignature] = useState("");
   const [error, setError] = useState<{ message: string; code?: string } | null>(
     () =>
       initialTokenDecodeFailed
         ? {
             message:
-              "The grant link in your URL was malformed. Paste the grant token from the merchant manually.",
+              "The grant link in your URL was malformed. Ask the merchant to send a fresh auditor portal link.",
             code: "url_token_invalid",
           }
         : null,
@@ -438,13 +424,7 @@ export function AuditorPortal({
   const runtimeConfig = useMemo(() => getUmbraRuntimeConfig(), []);
   const requiredAuditorRegistrationSol =
     UMBRA_COST_ESTIMATE_LAMPORTS.auditorRegistration;
-  const parsedGateToken = useMemo(() => {
-    try {
-      return parseGrantTokenPayload(JSON.parse(grantJson));
-    } catch {
-      return initialToken;
-    }
-  }, [grantJson, initialToken]);
+  const parsedGateToken = initialToken;
   const linkedSolanaWallets = useMemo(
     () => getLinkedSolanaWallets(user),
     [user],
@@ -623,11 +603,6 @@ export function AuditorPortal({
     };
   }, [runtimeConfig.rpcUrl, wallet?.address, walletsReady]);
 
-  function reset() {
-    setEvidence(null);
-    setError(null);
-  }
-
   function openLinkWallet() {
     linkWallet({
       walletChainType: "solana-only",
@@ -774,33 +749,6 @@ export function AuditorPortal({
     }
   }
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault();
-    setError(null);
-
-    try {
-      let parsedToken: GrantTokenPayload;
-      try {
-        const tokenObj = JSON.parse(grantJson);
-        parsedToken = parseGrantTokenPayload(tokenObj);
-      } catch (parseError) {
-        const message =
-          parseError instanceof AuditValidationError
-            ? parseError.message
-            : "This grant token is malformed.";
-        throw new Error(message);
-      }
-
-      const sig = parseTxSignature(txSignature.trim());
-      await loadEvidenceForSignature(parsedToken, sig);
-    } catch (err) {
-      const code = err instanceof ApiClientError ? err.code : undefined;
-      const message =
-        err instanceof Error ? err.message : "Unable to load evidence.";
-      setError({ message, code });
-    }
-  }
-
   return (
     <main className="flex min-h-screen flex-col bg-background">
       <header className="border-b border-card-border bg-card/30">
@@ -834,9 +782,9 @@ export function AuditorPortal({
             <h1 className="font-serif text-3xl font-semibold">Auditor Portal</h1>
           </div>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Paste a compliance grant and a Solana transaction signature to view
-            the underlying invoice. Only payments authorized by the merchant's
-            grant are decryptable here — everything else stays private.
+            Open a merchant-issued compliance grant to review the scoped
+            invoices and on-chain payments it authorizes. Everything outside the
+            grant stays private.
           </p>
         </section>
 
@@ -1061,6 +1009,24 @@ export function AuditorPortal({
                   </div>
                 )}
 
+                {error && (
+                  <div
+                    className={cn(
+                      "flex items-start gap-2 rounded-md border px-3 py-2 text-sm",
+                      error.code === "grant_revoked"
+                        ? "border-[var(--status-overdue)]/30 bg-[var(--status-overdue-bg)] text-[var(--status-overdue)]"
+                        : "border-destructive/20 bg-[var(--status-overdue-bg)] text-destructive",
+                    )}
+                  >
+                    {error.code === "grant_revoked" ? (
+                      <ShieldOff className="mt-0.5 size-4 shrink-0" />
+                    ) : (
+                      <XCircle className="mt-0.5 size-4 shrink-0" />
+                    )}
+                    <span>{error.message}</span>
+                  </div>
+                )}
+
                 {!isEvidenceIndexLoading &&
                   !evidenceIndexError &&
                   evidenceIndexItems.length === 0 && (
@@ -1105,95 +1071,6 @@ export function AuditorPortal({
                     </div>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-
-            <Card className="border-card-border">
-              <CardHeader>
-                <CardTitle className="font-serif text-lg">
-                  Advanced signature lookup
-                </CardTitle>
-                <CardDescription>
-                  Paste a UTXO signature manually. The request is still limited
-                  to this grant's scope.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="grant-json">Grant token (JSON)</Label>
-                    <Textarea
-                      id="grant-json"
-                      value={grantJson}
-                      onChange={(event) => {
-                        setGrantJson(event.target.value);
-                        setError(null);
-                      }}
-                      rows={5}
-                      placeholder='{"v":1,"grantId":"...","granterAddress":"...","auditorAddress":"..."}'
-                      className="font-mono text-xs"
-                      disabled={isLoading}
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    <Label htmlFor="tx-signature">Transaction signature</Label>
-                    <Input
-                      id="tx-signature"
-                      value={txSignature}
-                      onChange={(event) => {
-                        setTxSignature(event.target.value);
-                        setError(null);
-                      }}
-                      placeholder="Solana transaction signature (base58)"
-                      className="font-mono text-xs"
-                      disabled={isLoading}
-                      spellCheck={false}
-                      autoComplete="off"
-                    />
-                  </div>
-
-                  {error && (
-                    <div
-                      className={cn(
-                        "flex items-start gap-2 rounded-md border px-3 py-2 text-sm",
-                        error.code === "grant_revoked"
-                          ? "border-[var(--status-overdue)]/30 bg-[var(--status-overdue-bg)] text-[var(--status-overdue)]"
-                          : "border-destructive/20 bg-[var(--status-overdue-bg)] text-destructive",
-                      )}
-                    >
-                      {error.code === "grant_revoked" ? (
-                        <ShieldOff className="mt-0.5 size-4 shrink-0" />
-                      ) : (
-                        <XCircle className="mt-0.5 size-4 shrink-0" />
-                      )}
-                      <span>{error.message}</span>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="submit"
-                      disabled={
-                        isLoading ||
-                        grantJson.trim().length === 0 ||
-                        txSignature.trim().length === 0
-                      }
-                    >
-                      {isLoading ? (
-                        <Loader2 className="size-4 animate-spin" />
-                      ) : (
-                        <Sparkles className="size-4" />
-                      )}
-                      Load signature
-                    </Button>
-                    {evidence && (
-                      <Button type="button" variant="ghost" onClick={reset}>
-                        Clear
-                      </Button>
-                    )}
-                  </div>
-                </form>
               </CardContent>
             </Card>
           </div>
