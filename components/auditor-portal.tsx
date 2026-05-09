@@ -1,22 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePrivy } from "@privy-io/react-auth";
 import {
   CheckCircle2,
   Copy,
   ExternalLink,
   FileText,
+  KeyRound,
   Loader2,
   Lock,
   Shield,
   ShieldOff,
   Sparkles,
+  Wallet,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { AuditorSetupCard } from "@/components/auditor-setup-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +31,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  getAuditorGateState,
+  type AuditorRegistrationStatus,
+} from "@/features/audit/auditor-gate";
+import {
+  runAuditorUmbraRegistration,
+  type AuditorUmbraRegistrationStepId,
+} from "@/features/audit/auditor-registration";
 import { fetchEvidenceForToken } from "@/features/audit/client";
 import type {
   AuditorEvidenceResponse,
@@ -39,9 +49,20 @@ import {
   parseGrantTokenPayload,
   parseTxSignature,
 } from "@/features/audit/validators";
+import {
+  getLinkedSolanaWallets,
+  SOLANA_WALLET_LIST,
+} from "@/features/auth/privy-wallets";
 import { ApiClientError } from "@/features/auth/client";
 import { atomicToNumber } from "@/features/invoices/validators";
 import { getPaymentMintDisplayName } from "@/features/payments/mints";
+import { createPrivyUmbraSigner } from "@/features/checkout/privy-umbra-signer";
+import { usePrivyUmbraSigner } from "@/hooks/use-privy-umbra-signer";
+import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
+import {
+  isAuditorX25519Registered,
+  queryDueVaultUserRegistration,
+} from "@/lib/umbra/sdk";
 import { cn, truncateMiddle } from "@/lib/utils";
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -62,6 +83,15 @@ const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
 type AuditorPortalProps = {
   initialToken: GrantTokenPayload | null;
   initialTokenDecodeFailed?: boolean;
+};
+
+const STEP_LABEL: Record<AuditorUmbraRegistrationStepId, string> = {
+  checking: "Checking on-chain account",
+  account: "Initializing Umbra account",
+  encryption: "Registering x25519 key",
+  verifying: "Verifying registration",
+  complete: "Registration complete",
+  error: "Registration failed",
 };
 
 function explorerUrl(
@@ -100,6 +130,42 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
     <Label className="text-xs uppercase tracking-wider text-muted-foreground">
       {children}
     </Label>
+  );
+}
+
+function GateShell({
+  icon,
+  title,
+  body,
+  action,
+  secondaryAction,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  body: string;
+  action?: React.ReactNode;
+  secondaryAction?: React.ReactNode;
+}) {
+  return (
+    <Card className="border-card-border">
+      <CardHeader>
+        <div className="flex items-center gap-3">
+          <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            {icon}
+          </div>
+          <div className="flex flex-col">
+            <CardTitle className="font-serif text-lg">{title}</CardTitle>
+            <CardDescription>{body}</CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      {(action || secondaryAction) && (
+        <CardContent className="flex flex-col gap-3">
+          {action}
+          {secondaryAction}
+        </CardContent>
+      )}
+    </Card>
   );
 }
 
@@ -277,6 +343,14 @@ export function AuditorPortal({
   initialToken,
   initialTokenDecodeFailed = false,
 }: AuditorPortalProps) {
+  const {
+    authenticated,
+    getAccessToken,
+    linkWallet,
+    login,
+    ready: privyReady,
+    user,
+  } = usePrivy();
   const initialTokenJson = useMemo(
     () => (initialToken ? JSON.stringify(initialToken, null, 2) : ""),
     [initialToken],
@@ -295,10 +369,146 @@ export function AuditorPortal({
   );
   const [isLoading, setIsLoading] = useState(false);
   const [evidence, setEvidence] = useState<AuditorEvidenceResponse | null>(null);
+  const parsedGateToken = useMemo(() => {
+    try {
+      return parseGrantTokenPayload(JSON.parse(grantJson));
+    } catch {
+      return initialToken;
+    }
+  }, [grantJson, initialToken]);
+  const linkedSolanaWallets = useMemo(
+    () => getLinkedSolanaWallets(user),
+    [user],
+  );
+  const targetWalletAddress =
+    parsedGateToken?.auditorAddress &&
+    linkedSolanaWallets.some(
+      (wallet) => wallet.address === parsedGateToken.auditorAddress,
+    )
+      ? parsedGateToken.auditorAddress
+      : (linkedSolanaWallets[0]?.address ?? null);
+  const { wallet, walletsReady, signTransaction, signMessage } =
+    usePrivyUmbraSigner(targetWalletAddress);
+  const [registrationStatus, setRegistrationStatus] =
+    useState<AuditorRegistrationStatus>("unknown");
+  const [registrationError, setRegistrationError] = useState<string | null>(
+    null,
+  );
+  const [isCheckingRegistration, setIsCheckingRegistration] = useState(false);
+  const [registrationStep, setRegistrationStep] =
+    useState<AuditorUmbraRegistrationStepId | null>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const effectiveRegistrationStatus =
+    registrationError && !isCheckingRegistration
+      ? "unregistered"
+      : isCheckingRegistration
+        ? "unknown"
+        : registrationStatus;
+  const gateState = getAuditorGateState({
+    activeWalletAddress: wallet?.address ?? null,
+    authenticated,
+    linkedWalletAddress: targetWalletAddress,
+    privyReady,
+    registrationStatus: effectiveRegistrationStatus,
+    tokenAuditorAddress: parsedGateToken?.auditorAddress ?? null,
+    walletsReady,
+  });
+
+  const refreshRegistrationStatus = useCallback(async () => {
+    if (!wallet) return;
+    setIsCheckingRegistration(true);
+    setRegistrationError(null);
+
+    try {
+      const runtimeConfig = getUmbraRuntimeConfig();
+      const signer = createPrivyUmbraSigner({
+        wallet,
+        signTransaction,
+        signMessage,
+        network: runtimeConfig.network,
+      });
+      const account = await queryDueVaultUserRegistration(
+        {
+          ...runtimeConfig,
+          signer,
+          deferMasterSeedSignature: true,
+          preferPollingTransactionForwarder: true,
+        },
+        wallet.address,
+      );
+      setRegistrationStatus(
+        isAuditorX25519Registered(account) ? "registered" : "unregistered",
+      );
+    } catch (err) {
+      setRegistrationStatus("unknown");
+      setRegistrationError(
+        err instanceof Error
+          ? err.message
+          : "Unable to check Umbra registration status.",
+      );
+    } finally {
+      setIsCheckingRegistration(false);
+    }
+  }, [signMessage, signTransaction, wallet]);
+
+  useEffect(() => {
+    setRegistrationStatus("unknown");
+    setRegistrationError(null);
+    setRegistrationStep(null);
+
+    if (!wallet || !walletsReady) {
+      return;
+    }
+
+    void refreshRegistrationStatus();
+  }, [refreshRegistrationStatus, wallet, walletsReady]);
 
   function reset() {
     setEvidence(null);
     setError(null);
+  }
+
+  function openLinkWallet() {
+    linkWallet({
+      walletChainType: "solana-only",
+      walletList: SOLANA_WALLET_LIST,
+    });
+  }
+
+  async function handleRegister() {
+    if (!wallet) {
+      toast.error("Connect your Solana wallet first.");
+      return;
+    }
+
+    setIsRegistering(true);
+    setRegistrationError(null);
+    setRegistrationStep("checking");
+
+    try {
+      const result = await runAuditorUmbraRegistration({
+        wallet,
+        signTransaction,
+        signMessage,
+        onStep: setRegistrationStep,
+      });
+      setRegistrationStatus("registered");
+      toast.success(
+        result.alreadyRegistered
+          ? "Your Umbra x25519 key was already registered."
+          : "Umbra x25519 key registered.",
+      );
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Unable to register your Umbra x25519 key.";
+      setRegistrationError(message);
+      setRegistrationStep("error");
+      toast.error(message);
+    } finally {
+      setIsRegistering(false);
+    }
   }
 
   async function handleSubmit(event: React.FormEvent) {
@@ -324,7 +534,7 @@ export function AuditorPortal({
       const next = await fetchEvidenceForToken({
         token: parsedToken,
         txSignature: sig,
-      });
+      }, getAccessToken);
       setEvidence(next);
     } catch (err) {
       const code = err instanceof ApiClientError ? err.code : undefined;
@@ -375,8 +585,149 @@ export function AuditorPortal({
           </p>
         </section>
 
-        {!initialToken && !initialTokenDecodeFailed && <AuditorSetupCard />}
+        {!gateState.canShowDecryptForm && (
+          <>
+            {gateState.kind === "loading" && (
+              <GateShell
+                icon={<Loader2 className="size-5 animate-spin" />}
+                title="Loading auditor setup"
+                body="Preparing your wallet session."
+              />
+            )}
 
+            {gateState.kind === "sign_in" && (
+              <GateShell
+                icon={<KeyRound className="size-5" />}
+                title="Sign in to use this audit grant"
+                body="Auditors must sign in and use the Solana wallet the merchant issued the grant to."
+                action={
+                  <Button onClick={() => login()} className="w-full md:w-auto">
+                    Sign in with Privy
+                  </Button>
+                }
+              />
+            )}
+
+            {gateState.kind === "connect_wallet" && (
+              <GateShell
+                icon={<Wallet className="size-5" />}
+                title="Connect your auditor wallet"
+                body="Connect the Solana wallet the merchant will grant audit access to."
+                action={
+                  <Button onClick={openLinkWallet} className="w-full md:w-auto">
+                    Connect Solana wallet
+                  </Button>
+                }
+              />
+            )}
+
+            {gateState.kind === "wallet_mismatch" && (
+              <GateShell
+                icon={<ShieldOff className="size-5" />}
+                title="Use the wallet this grant was issued to"
+                body={`This grant is for ${truncateMiddle(
+                  gateState.expectedAddress,
+                )}, but you're signed in with ${truncateMiddle(
+                  gateState.connectedAddress,
+                )}. Switch to the grant recipient wallet to continue.`}
+                action={
+                  <Button onClick={openLinkWallet} className="w-full md:w-auto">
+                    Use a different wallet
+                  </Button>
+                }
+              />
+            )}
+
+            {gateState.kind === "connect_active_wallet" && (
+              <GateShell
+                icon={<Wallet className="size-5" />}
+                title="Connect this Solana wallet"
+                body={`Privy knows ${truncateMiddle(
+                  gateState.walletAddress,
+                )}, but it is not connected for signing yet. Reconnect or switch to this wallet to continue.`}
+                action={
+                  <Button onClick={openLinkWallet} className="w-full md:w-auto">
+                    Connect wallet
+                  </Button>
+                }
+              />
+            )}
+
+            {gateState.kind === "checking" && (
+              <GateShell
+                icon={<Loader2 className="size-5 animate-spin" />}
+                title="Checking your Umbra registration"
+                body={`Looking up the on-chain Umbra x25519 key for ${truncateMiddle(
+                  gateState.walletAddress,
+                )}.`}
+              />
+            )}
+
+            {gateState.kind === "register" && (
+              <Card className="border-card-border">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <KeyRound className="size-5" />
+                    </div>
+                    <div className="flex flex-col">
+                      <CardTitle className="font-serif text-lg">
+                        Register your Umbra x25519 key
+                      </CardTitle>
+                      <CardDescription>
+                        Wallet {truncateMiddle(gateState.walletAddress)} needs a
+                        one-time Umbra x25519 key before it can use audit grants.
+                      </CardDescription>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  {registrationStep && registrationStep !== "error" && (
+                    <div className="flex items-center gap-2 rounded-md border border-border bg-muted/10 px-3 py-2 text-sm text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin" />
+                      {STEP_LABEL[registrationStep]}
+                    </div>
+                  )}
+
+                  {registrationError && (
+                    <div className="flex items-start gap-2 rounded-md border border-destructive/20 bg-[var(--status-overdue-bg)] px-3 py-2 text-sm text-destructive">
+                      <XCircle className="mt-0.5 size-4 shrink-0" />
+                      <span>{registrationError}</span>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      onClick={() => void handleRegister()}
+                      disabled={isRegistering}
+                    >
+                      {isRegistering ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="size-4" />
+                      )}
+                      {isRegistering ? "Registering..." : "Register x25519 key"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={openLinkWallet}
+                    >
+                      Use a different wallet
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      You'll be prompted to sign the Umbra consent message and
+                      one on-chain transaction.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </>
+        )}
+
+        {gateState.canShowDecryptForm && (
         <Card className="border-card-border">
           <CardHeader>
             <CardTitle className="font-serif text-lg">Decrypt invoice</CardTitle>
@@ -463,6 +814,7 @@ export function AuditorPortal({
             </form>
           </CardContent>
         </Card>
+        )}
 
         {evidence && <EvidenceView evidence={evidence} />}
 

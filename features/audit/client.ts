@@ -154,16 +154,23 @@ export async function revokeAndPersistGrant(
   return payload.grant;
 }
 
-export async function fetchEvidenceForToken(args: {
-  token: GrantTokenPayload;
-  txSignature: string;
-}) {
-  const response = await fetch("/api/audit/decrypt-evidence", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(args),
-    cache: "no-store",
-  });
+export async function fetchEvidenceForToken(
+  args: {
+    token: GrantTokenPayload;
+    txSignature: string;
+  },
+  getAuthToken: GetAuthToken,
+) {
+  const response = await authenticatedFetch(
+    "/api/audit/decrypt-evidence",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(args),
+      cache: "no-store",
+    },
+    getAuthToken,
+  );
   const payload = (await response.json()) as EvidenceResponse;
 
   if (!response.ok || !payload.evidence) {
