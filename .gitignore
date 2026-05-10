@@ -14,3 +14,7 @@ prisma/dev.db-journal
 codex-session.jsonl
 .superpowers/*
 docs/*
+!docs/umbra-sdk-product-flows.md
+!docs/demo-video-script.md
+!docs/pitch-deck-outline.md
+!docs/hackathon-submission.md
