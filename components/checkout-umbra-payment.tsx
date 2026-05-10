@@ -406,12 +406,8 @@ function CheckoutUmbraPaymentInner({
   }
 
   function getPrimaryActionLabel() {
-    if (hasConfirmedPayment) {
-      return "Payment confirmed";
-    }
-
-    if (hasSubmittedPayment) {
-      return "Awaiting merchant confirmation";
+    if (hasPaymentInReview) {
+      return "Payment completed";
     }
 
     if (isPaymentRunning) {
@@ -667,9 +663,7 @@ function CheckoutUmbraPaymentInner({
               Umbra payment status
             </p>
             <p className="mt-2 text-sm text-slate-700">
-              {umbra.latestPayment.status === "submitted"
-                ? "Submitted and waiting for merchant confirmation."
-                : "Confirmed by the merchant."}
+              Your private payment has been sent.
             </p>
             {umbra.latestPayment.createUtxoSignaturePreview && (
               <p className="mt-2 font-mono text-xs text-slate-500">

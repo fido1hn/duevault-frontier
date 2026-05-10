@@ -40,25 +40,18 @@ export function mapCheckoutPaymentStatus(
   status: InvoiceStatus,
   latestUmbraPayment?: PublicUmbraPaymentStatus | null,
 ): CheckoutPaymentStatus {
-  if (latestUmbraPayment?.status === "submitted") {
+  if (
+    latestUmbraPayment?.status === "submitted" ||
+    latestUmbraPayment?.status === "confirmed" ||
+    status === "Detected"
+  ) {
     return {
       rawStatus: status,
-      statusLabel: "Payment submitted",
+      statusLabel: "Payment completed",
       statusDescription:
-        "The customer submitted Umbra payment evidence. The merchant still needs to confirm the claimable UTXO.",
-      statusTone: "pending",
-      statusStep: 2,
-    };
-  }
-
-  if (status === "Detected") {
-    return {
-      rawStatus: status,
-      statusLabel: "Payment pending",
-      statusDescription:
-        "We detected a matching payment and are waiting for it to settle.",
-      statusTone: "pending",
-      statusStep: 2,
+        "Your private payment has been submitted to the network.",
+      statusTone: "complete",
+      statusStep: 3,
     };
   }
 
