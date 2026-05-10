@@ -254,7 +254,6 @@ export async function runCustomerUmbraPayment({
   onStep?.("wallet");
   const runtimeConfig = getUmbraRuntimeConfig();
   const signer = createPrivyUmbraSigner({
-    network: runtimeConfig.network,
     signMessage,
     signTransaction,
     wallet,

@@ -4,7 +4,7 @@ import type {
   PrivacyRail,
 } from "@/features/invoices/types";
 
-export type UmbraNetwork = "devnet" | "mainnet";
+export type UmbraNetwork = "mainnet";
 export type UmbraRegistrationStatus =
   | "not_setup"
   | "registering"

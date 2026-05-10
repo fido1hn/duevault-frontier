@@ -12,7 +12,7 @@ import {
 
 const SIGNATURE =
   "5N4eBfdd7tm9axp5Dz5GU9h1tmM1CpMjzLvG2h76kKtozQZHVqJPD5nT1MS1w6jDx8mvUzzTcJ1q8m7aA6dYkQgb";
-const UMBRA_DEVNET_MINT = "GvUQDFLWYH4QHKYot787616f61m1m5eZofhYKyaBkPn9";
+const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const OPTIONAL_DATA = "a".repeat(64);
 const TOKEN_PROGRAM = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 const ASSOCIATED_TOKEN_PROGRAM = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
@@ -55,7 +55,7 @@ function buildDepositInstructionData(amount, proofOffset = 7n) {
 function buildFixture({
   amount = 250_000n,
   eventOptionalData = OPTIONAL_DATA,
-    mint = UMBRA_DEVNET_MINT,
+    mint = USDC_MINT,
   payer = key(),
   programAddress = UMBRA_PROGRAM_ADDRESS,
   transactionAmount = amount,

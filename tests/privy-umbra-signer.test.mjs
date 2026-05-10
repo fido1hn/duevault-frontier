@@ -32,7 +32,6 @@ function makeSignature(byte) {
 
 function makeSigner(signTransaction) {
   return createPrivyUmbraSigner({
-    network: "mainnet",
     signMessage: async ({ message }) => ({
       signature: makeSignature(message[0] ?? 1),
     }),

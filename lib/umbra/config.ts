@@ -1,6 +1,6 @@
 import {
-  resolvePaymentMintForNetwork,
-  type ResolvedPaymentMintConfig,
+  getPaymentMintConfig,
+  type PaymentMintConfig,
 } from "@/features/payments/mints";
 import type { UmbraNetwork } from "@/features/merchant-profiles/types";
 
@@ -12,7 +12,7 @@ export type UmbraRuntimeConfig = {
 };
 
 export type UmbraAppConfig = UmbraRuntimeConfig & {
-  checkoutMint: ResolvedPaymentMintConfig;
+  checkoutMint: PaymentMintConfig;
 };
 
 export const UMBRA_APP_NETWORK = "mainnet" as const;
@@ -33,14 +33,18 @@ function isProductionRuntime() {
   return process.env.NODE_ENV === "production";
 }
 
-function normalizeNetwork(value: string | undefined): UmbraNetwork | null {
+function normalizeNetwork(value: string | undefined): UmbraNetwork | string | null {
   const normalized = value?.trim();
 
-  if (normalized === "mainnet" || normalized === "devnet") {
+  if (!normalized) {
+    return null;
+  }
+
+  if (normalized === "mainnet") {
     return normalized;
   }
 
-  return null;
+  return normalized;
 }
 
 function assertExpectedEnvValue(
@@ -83,7 +87,7 @@ function readUmbraUrlEnv(
 export function getUmbraRuntimeNetwork(): UmbraNetwork {
   const network = normalizeNetwork(process.env.NEXT_PUBLIC_UMBRA_NETWORK);
 
-  if (network && network !== UMBRA_APP_NETWORK) {
+  if (network !== null && network !== UMBRA_APP_NETWORK) {
     throw new Error("Umbra checkout must run on mainnet for this app.");
   }
 
@@ -98,10 +102,7 @@ export function getUmbraCheckoutMint() {
     UMBRA_APP_CHECKOUT_MINT_ID,
   );
 
-  return resolvePaymentMintForNetwork(
-    UMBRA_APP_CHECKOUT_MINT_ID,
-    getUmbraRuntimeNetwork(),
-  );
+  return getPaymentMintConfig(UMBRA_APP_CHECKOUT_MINT_ID);
 }
 
 export function getUmbraRuntimeConfig(): UmbraRuntimeConfig {

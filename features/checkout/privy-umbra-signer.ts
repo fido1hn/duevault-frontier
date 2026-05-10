@@ -12,8 +12,6 @@ import {
 } from "@solana/kit";
 import type { IUmbraSigner } from "@umbra-privacy/sdk/interfaces";
 
-import type { UmbraRuntimeConfig } from "@/lib/umbra/config";
-
 type PrivySignTransaction = UseSignTransaction["signTransaction"];
 type PrivySignMessage = UseSignMessage["signMessage"];
 type PrivySignTransactionInput = Parameters<PrivySignTransaction>[0];
@@ -23,15 +21,10 @@ export type PrivyUmbraSigningInput = {
   wallet: ConnectedStandardSolanaWallet;
   signTransaction: PrivySignTransaction;
   signMessage: PrivySignMessage;
-  network: UmbraRuntimeConfig["network"];
 };
 
-function getPrivySolanaChain(network: UmbraRuntimeConfig["network"]) {
-  if (network === "mainnet") {
-    return "solana:mainnet" as PrivySolanaChain;
-  }
-
-  return "solana:devnet" as PrivySolanaChain;
+function getPrivySolanaChain() {
+  return "solana:mainnet" as PrivySolanaChain;
 }
 
 function getFirstResult<T>(value: T | T[]) {
@@ -58,13 +51,12 @@ function assertWalletSignedTransaction(
 }
 
 export function createPrivyUmbraSigner({
-  network,
   signMessage,
   signTransaction,
   wallet,
 }: PrivyUmbraSigningInput): IUmbraSigner {
   const signerAddress = address(wallet.address);
-  const chain = getPrivySolanaChain(network);
+  const chain = getPrivySolanaChain();
   const transactionEncoder = getTransactionEncoder();
   const transactionDecoder = getTransactionDecoder();
   const signUmbraTransaction: IUmbraSigner["signTransaction"] = async (

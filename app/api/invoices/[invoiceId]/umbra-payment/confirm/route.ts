@@ -16,7 +16,7 @@ import {
   assertInvoiceStatus,
 } from "@/features/invoices/validators";
 import { assertUmbraNetwork } from "@/features/merchant-profiles/validators";
-import { resolvePaymentMintForNetwork } from "@/features/payments/mints";
+import { getPaymentMintConfig } from "@/features/payments/mints";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import { AuthError, authErrorResponse, requireMerchantProfile } from "@/server/auth";
 import { db } from "@/server/db";
@@ -158,15 +158,9 @@ export async function POST(
     assertUmbraNetwork(invoice.merchantProfile.umbraNetwork);
 
     const currentInvoiceStatus = invoice.status;
-    const expectedMint = resolvePaymentMintForNetwork(
-      invoice.mint,
-      invoice.merchantProfile.umbraNetwork,
-    );
+    const expectedMint = getPaymentMintConfig(invoice.mint);
 
-    if (
-      payment.network !== runtimeConfig.network ||
-      invoice.merchantProfile.umbraNetwork !== runtimeConfig.network
-    ) {
+    if (payment.network !== runtimeConfig.network) {
       return NextResponse.json(
         { error: "Umbra network does not match this checkout." },
         { status: 409 },

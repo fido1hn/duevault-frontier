@@ -184,7 +184,6 @@ export default function CompliancePage() {
         wallet,
         signTransaction,
         signMessage,
-        network: runtimeConfig.network,
       }),
       deferMasterSeedSignature: true,
       preferPollingTransactionForwarder: true,

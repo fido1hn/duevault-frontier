@@ -44,7 +44,7 @@ import {
 import { getProxiedUmbraZkAssetProvider } from "@/lib/umbra/zk-assets";
 import { DEFAULT_INDEXER_ENDPOINT } from "@/lib/umbra/config";
 
-export type DueVaultNetwork = "mainnet" | "devnet";
+export type DueVaultNetwork = "mainnet";
 
 export type DueVaultConfig = {
   network: DueVaultNetwork;

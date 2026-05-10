@@ -451,11 +451,6 @@ function CheckoutUmbraPaymentInner({
               Requires {umbra.network} SOL for Umbra setup and fees, plus{" "}
               {mint} for the invoice amount.
             </p>
-            {umbra.isTestMint && umbra.mintNotice && (
-              <p className="mt-2 text-xs font-medium leading-relaxed text-amber-700">
-                {umbra.mintNotice}
-              </p>
-            )}
           </div>
           <Button
             type="button"

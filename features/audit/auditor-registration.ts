@@ -50,7 +50,6 @@ export async function runAuditorUmbraRegistration({
     wallet,
     signTransaction,
     signMessage,
-    network: runtimeConfig.network,
   });
   const config = {
     ...runtimeConfig,

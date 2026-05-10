@@ -13,7 +13,7 @@ import {
 import { verifyUmbraPaymentEvidence } from "@/features/checkout/umbra-payment-verification";
 import { serializePublicUmbraPaymentStatus } from "@/features/invoices/mappers";
 import { getInvoiceByPublicId } from "@/features/invoices/service";
-import { resolvePaymentMintForNetwork } from "@/features/payments/mints";
+import { getPaymentMintConfig } from "@/features/payments/mints";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import { db } from "@/server/db";
 import { checkUmbraPaymentSaveRateLimit } from "@/server/umbra-payment-rate-limit";
@@ -124,29 +124,23 @@ export async function POST(
     }
 
     const runtimeConfig = getUmbraRuntimeConfig();
-    let expectedMint: ReturnType<typeof resolvePaymentMintForNetwork>;
+    let expectedMint: ReturnType<typeof getPaymentMintConfig>;
 
     try {
-      expectedMint = resolvePaymentMintForNetwork(
-        invoice.mint,
-        invoice.merchantUmbraNetwork,
-      );
+      expectedMint = getPaymentMintConfig(invoice.mint);
     } catch (error) {
       return NextResponse.json(
         {
           error:
             error instanceof Error
               ? error.message
-              : "Checkout mint is not supported for this Umbra network.",
+              : "Checkout mint is not supported.",
         },
         { status: 409 },
       );
     }
 
-    if (
-      payload.network !== runtimeConfig.network ||
-      payload.network !== invoice.merchantUmbraNetwork
-    ) {
+    if (payload.network !== runtimeConfig.network) {
       return NextResponse.json(
         { error: "Umbra network does not match this checkout." },
         { status: 400 },

@@ -1,5 +1,5 @@
 ALTER TABLE "MerchantProfile"
-ADD COLUMN "umbraNetwork" TEXT NOT NULL DEFAULT 'devnet',
+ADD COLUMN "umbraNetwork" TEXT NOT NULL DEFAULT 'mainnet',
 ADD COLUMN "umbraStatus" TEXT NOT NULL DEFAULT 'not_setup',
 ADD COLUMN "umbraRegisteredAt" TIMESTAMP(3),
 ADD COLUMN "umbraWalletAddress" TEXT,

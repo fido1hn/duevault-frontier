@@ -97,7 +97,7 @@ bun run dev
 
 Open http://localhost:3000.
 
-> **Live Umbra payments locally?** `.env.example` is wired to **devnet** by default, but the runtime config in [lib/umbra/config.ts](lib/umbra/config.ts) currently rejects anything but `mainnet` for the live app. To exercise the full private-payment flow locally you'd need to override the `NEXT_PUBLIC_UMBRA_*` block to mainnet — meaning **real funds**. For most reviewers, the dashboard / invoice / checkout flow is enough to evaluate the codebase; rely on **duevault.xyz** for end-to-end mainnet behavior.
+> **Mainnet-only:** local and production Umbra flows both use Solana mainnet USDC. Full private-payment tests use real funds, so keep invoice amounts tiny.
 
 ### Tests
 

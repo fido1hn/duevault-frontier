@@ -50,7 +50,6 @@ describe("Umbra runtime config", () => {
     });
     expect(getUmbraCheckoutMint()).toMatchObject({
       id: "USDC",
-      network: "mainnet",
     });
   });
 
@@ -61,17 +60,16 @@ describe("Umbra runtime config", () => {
     expect(getUmbraRuntimeNetwork()).toBe("mainnet");
     expect(getUmbraCheckoutMint()).toMatchObject({
       id: "USDC",
-      network: "mainnet",
     });
     expect(() => getUmbraRuntimeConfig()).toThrow(/NEXT_PUBLIC_UMBRA_RPC_URL/);
   });
 
-  test("production with devnet throws", () => {
+  test("production with non-mainnet network throws", () => {
     process.env.NODE_ENV = "production";
-    process.env.NEXT_PUBLIC_UMBRA_NETWORK = "devnet";
-    process.env.NEXT_PUBLIC_UMBRA_RPC_URL = "https://api.devnet.solana.com";
+    process.env.NEXT_PUBLIC_UMBRA_NETWORK = "testnet";
+    process.env.NEXT_PUBLIC_UMBRA_RPC_URL = "https://rpc.example.invalid";
     process.env.NEXT_PUBLIC_UMBRA_RPC_SUBSCRIPTIONS_URL =
-      "wss://api.devnet.solana.com";
+      "wss://rpc.example.invalid";
 
     expect(() => getUmbraRuntimeNetwork()).toThrow(/mainnet/);
   });
@@ -79,7 +77,7 @@ describe("Umbra runtime config", () => {
   test("production rejects non-USDC checkout mint config", () => {
     process.env.NODE_ENV = "production";
     process.env.NEXT_PUBLIC_UMBRA_NETWORK = "mainnet";
-    process.env.NEXT_PUBLIC_CHECKOUT_MINT_ID = "UMBRA_DEVNET";
+    process.env.NEXT_PUBLIC_CHECKOUT_MINT_ID = "NOT_USDC";
     process.env.NEXT_PUBLIC_UMBRA_RPC_URL = "https://mainnet.example";
     process.env.NEXT_PUBLIC_UMBRA_RPC_SUBSCRIPTIONS_URL =
       "wss://mainnet.example";
@@ -97,7 +95,6 @@ describe("Umbra runtime config", () => {
     expect(getUmbraRuntimeNetwork()).toBe("mainnet");
     expect(getUmbraCheckoutMint()).toMatchObject({
       id: "USDC",
-      network: "mainnet",
     });
     expect(() => getUmbraRuntimeConfig()).toThrow(/NEXT_PUBLIC_UMBRA_RPC_URL/);
   });
@@ -122,7 +119,6 @@ describe("Umbra runtime config", () => {
       rpcSubscriptionsUrl: "wss://mainnet.example",
       checkoutMint: {
         id: "USDC",
-        network: "mainnet",
       },
     });
   });

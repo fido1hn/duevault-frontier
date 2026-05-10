@@ -38,7 +38,7 @@ export function sanitizeContactEmail(value: string) {
 }
 
 export function assertUmbraNetwork(value: string): asserts value is UmbraNetwork {
-  if (value !== "devnet" && value !== "mainnet") {
+  if (value !== "mainnet") {
     throw new Error("Invalid Umbra network.");
   }
 }

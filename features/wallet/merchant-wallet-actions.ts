@@ -8,7 +8,7 @@ import type {
 import type { MasterSeed } from "@umbra-privacy/sdk/types";
 
 import { createPrivyUmbraSigner } from "@/features/checkout/privy-umbra-signer";
-import type { ResolvedPaymentMintConfig } from "@/features/payments/mints";
+import type { PaymentMintConfig } from "@/features/payments/mints";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import type { DueVaultConfig } from "@/lib/umbra/sdk";
 import { queryPrivateBalance, withdrawPrivateBalance } from "@/lib/umbra/sdk";
@@ -17,7 +17,7 @@ type MerchantWalletActionInput = {
   wallet: ConnectedStandardSolanaWallet;
   signTransaction: UseSignTransaction["signTransaction"];
   signMessage: UseSignMessage["signMessage"];
-  mint: ResolvedPaymentMintConfig;
+  mint: PaymentMintConfig;
   masterSeedStorage: NonNullable<DueVaultConfig["masterSeedStorage"]>;
 };
 
@@ -85,19 +85,12 @@ function createMerchantWalletConfig({
 }: MerchantWalletActionInput): DueVaultConfig {
   const runtimeConfig = getUmbraRuntimeConfig();
 
-  if (mint.network !== runtimeConfig.network) {
-    throw new Error(
-      `Wallet mint ${mint.symbol} is configured for ${mint.network}, but Umbra is running on ${runtimeConfig.network}.`,
-    );
-  }
-
   return {
     ...runtimeConfig,
     signer: createPrivyUmbraSigner({
       wallet,
       signTransaction,
       signMessage,
-      network: runtimeConfig.network,
     }),
     deferMasterSeedSignature: true,
     preferPollingTransactionForwarder: true,

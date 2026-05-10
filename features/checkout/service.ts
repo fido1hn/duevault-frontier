@@ -10,7 +10,7 @@ import type {
   UmbraNetwork,
   UmbraRegistrationStatus,
 } from "@/features/merchant-profiles/types";
-import type { ResolvedPaymentMintConfig } from "@/features/payments/mints";
+import type { PaymentMintConfig } from "@/features/payments/mints";
 import { getUmbraCheckoutMint, getUmbraRuntimeNetwork } from "@/lib/umbra/config";
 
 export { mapCheckoutPaymentStatus };
@@ -38,8 +38,6 @@ export type CheckoutPaymentViewModel = {
   mintAddress: string | null;
   mintDisplayName: string;
   mintDecimals: number;
-  isTestMint: boolean;
-  mintNotice: string | null;
   dueLong: string;
   lineItems: CheckoutPaymentLineItem[];
   receiverAddress: string | null;
@@ -68,8 +66,6 @@ export type CheckoutUmbraPaymentViewModel = {
   mintAddress: string | null;
   mintDisplayName: string;
   mintDecimals: number;
-  isTestMint: boolean;
-  mintNotice: string | null;
   optionalData: string;
   latestPayment: PublicUmbraPaymentStatus | null;
 };
@@ -79,14 +75,14 @@ type CheckoutPaymentConfig =
       isConfigured: true;
       network: UmbraNetwork;
       receiverAddress: string;
-      mint: ResolvedPaymentMintConfig;
+      mint: PaymentMintConfig;
     }
   | {
       isConfigured: false;
       network: UmbraNetwork;
       error: string;
       receiverAddress: null;
-      mint: ResolvedPaymentMintConfig | null;
+      mint: PaymentMintConfig | null;
     };
 
 export const CHECKOUT_UMBRA_OPTIONAL_DATA_PREFIX = "duevault:invoice:";
@@ -106,7 +102,7 @@ function formatSolanaPayAmount(amount: number) {
 export function getCheckoutPaymentConfig(): CheckoutPaymentConfig {
   const network = getUmbraRuntimeNetwork();
   const receiverAddress = process.env.NEXT_PUBLIC_CHECKOUT_RECIPIENT_ADDRESS?.trim();
-  let mint: ResolvedPaymentMintConfig;
+  let mint: PaymentMintConfig;
 
   try {
     mint = getUmbraCheckoutMint();

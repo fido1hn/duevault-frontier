@@ -171,13 +171,11 @@ async function getCheckoutRecord(intentId: string) {
 function getConfigurationError({
   isUmbraCheckout,
   invoiceMint,
-  invoiceNetwork,
   paymentConfig,
   receiverAddress,
 }: {
   isUmbraCheckout: boolean;
   invoiceMint: PaymentMintId;
-  invoiceNetwork: UmbraNetwork;
   paymentConfig: ReturnType<typeof getCheckoutPaymentConfig>;
   receiverAddress: string | null;
 }) {
@@ -194,10 +192,6 @@ function getConfigurationError({
   }
 
   if (isUmbraCheckout) {
-    if (invoiceNetwork !== paymentConfig.network) {
-      return `Merchant Umbra setup is for ${invoiceNetwork}, but checkout is configured for ${paymentConfig.network}.`;
-    }
-
     return null;
   }
 
@@ -237,7 +231,6 @@ function buildCheckoutViewModel(invoice: CheckoutRecord): CheckoutPaymentViewMod
   const configurationError = getConfigurationError({
     isUmbraCheckout,
     invoiceMint: invoice.mint,
-    invoiceNetwork: invoice.merchantUmbraNetwork,
     paymentConfig,
     receiverAddress: checkoutReceiverAddress,
   });
@@ -275,8 +268,6 @@ function buildCheckoutViewModel(invoice: CheckoutRecord): CheckoutPaymentViewMod
     mintAddress: configuredMintAddress,
     mintDisplayName: recordMint.displayName,
     mintDecimals: recordMint.decimals,
-    isTestMint: recordMint.isTestMint,
-    mintNotice: recordMint.testnetNotice,
     dueLong: invoice.dueLong,
     lineItems: invoice.lineItems,
     receiverAddress: checkoutReceiverAddress,
@@ -310,8 +301,6 @@ function buildCheckoutViewModel(invoice: CheckoutRecord): CheckoutPaymentViewMod
             mintAddress: configuredMintAddress,
             mintDisplayName: recordMint.displayName,
             mintDecimals: recordMint.decimals,
-            isTestMint: recordMint.isTestMint,
-            mintNotice: recordMint.testnetNotice,
             optionalData: buildUmbraInvoiceOptionalData(invoice.publicId),
             latestPayment: invoice.latestUmbraPayment,
           }

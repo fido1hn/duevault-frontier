@@ -39,7 +39,6 @@ describe("getCheckoutPaymentConfig", () => {
       receiverAddress: "11111111111111111111111111111111",
       mint: {
         id: "USDC",
-        network: "mainnet",
       },
     });
   });

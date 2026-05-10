@@ -254,7 +254,6 @@ export default function SettlementPage() {
         wallet: ready.merchantWallet,
         signTransaction,
         signMessage,
-        network: runtimeConfig.network,
       });
 
       setStepId("preparing");

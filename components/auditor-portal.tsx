@@ -98,12 +98,8 @@ const STEP_LABEL: Record<AuditorUmbraRegistrationStepId, string> = {
   error: "Registration failed",
 };
 
-function explorerUrl(
-  signature: string,
-  network: AuditorEvidenceResponse["payment"]["network"],
-) {
-  const cluster = network === "devnet" ? "?cluster=devnet" : "";
-  return `https://explorer.solana.com/tx/${signature}${cluster}`;
+function explorerUrl(signature: string) {
+  return `https://explorer.solana.com/tx/${signature}`;
 }
 
 function formatAmount(atomic: string, mint: AuditorEvidenceResponse["invoice"]["mint"]) {
@@ -328,7 +324,7 @@ function EvidenceView({ evidence }: { evidence: AuditorEvidenceResponse }) {
                 className="h-7 px-2 text-xs"
               >
                 <Link
-                  href={explorerUrl(payment.createUtxoSignature, payment.network)}
+                  href={explorerUrl(payment.createUtxoSignature)}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -498,7 +494,6 @@ export function AuditorPortal({
         wallet,
         signTransaction,
         signMessage,
-        network: runtimeConfig.network,
       });
       const account = await queryDueVaultUserRegistration(
         {

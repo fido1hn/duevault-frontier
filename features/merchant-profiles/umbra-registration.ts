@@ -93,7 +93,6 @@ export async function runMerchantUmbraRegistration({
     wallet,
     signTransaction,
     signMessage,
-    network: runtimeConfig.network,
   });
   const config = {
     ...runtimeConfig,

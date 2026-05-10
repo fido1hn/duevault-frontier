@@ -132,7 +132,6 @@ export async function findMerchantClaimableUmbraPayment({
     wallet,
     signTransaction,
     signMessage,
-    network: runtimeConfig.network,
   });
   const client = await createDueVaultClient({
     ...runtimeConfig,

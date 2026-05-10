@@ -24,13 +24,13 @@ afterEach(() => {
 
 describe("buildDemoCheckoutViewModel", () => {
   test("returns a read-only Umbra mainnet preview regardless of env", () => {
-    process.env.NEXT_PUBLIC_UMBRA_NETWORK = "devnet";
-    process.env.NEXT_PUBLIC_CHECKOUT_MINT_ID = "UMBRA_DEVNET";
+    process.env.NEXT_PUBLIC_UMBRA_NETWORK = "testnet";
+    process.env.NEXT_PUBLIC_CHECKOUT_MINT_ID = "NOT_USDC";
     process.env.NEXT_PUBLIC_CHECKOUT_RECIPIENT_ADDRESS =
       "11111111111111111111111111111111";
 
     const checkout = buildDemoCheckoutViewModel();
-    const mainnetUsdcAddress = getPaymentMintConfig("USDC").addresses.mainnet;
+    const mainnetUsdcAddress = getPaymentMintConfig("USDC").address;
 
     expect(checkout).toMatchObject({
       paymentMode: "umbra",
@@ -39,7 +39,6 @@ describe("buildDemoCheckoutViewModel", () => {
       demoNotice: DEMO_CHECKOUT_NOTICE,
       solanaPayUrl: null,
       mint: "USDC",
-      mintNotice: null,
       receiverAddress: DEMO_MERCHANT_RECEIVER_ADDRESS,
       configurationError: null,
       statusEndpoint: null,
@@ -50,8 +49,6 @@ describe("buildDemoCheckoutViewModel", () => {
       merchantReady: true,
       merchantWalletAddress: DEMO_MERCHANT_RECEIVER_ADDRESS,
       mintAddress: mainnetUsdcAddress,
-      mintNotice: null,
-      isTestMint: false,
       latestPayment: null,
     });
   });

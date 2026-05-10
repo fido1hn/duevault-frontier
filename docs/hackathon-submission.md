@@ -52,5 +52,4 @@ The app is live on Solana mainnet with USDC at `https://duevault.xyz`. The repos
 
 ## Notes For Judges
 
-Production uses Solana mainnet and USDC. Use tiny payment amounts when testing live flows. Local setup supports the app shell and standard workflows, but full Umbra payment execution should be evaluated on the production app unless you intentionally configure local mainnet Umbra RPC settings.
-
+DueVault is mainnet-only. Production and local Umbra flows use Solana mainnet USDC, so use tiny payment amounts when testing live flows.
