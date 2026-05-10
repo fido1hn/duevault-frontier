@@ -169,6 +169,9 @@ export default function SettlementPage() {
                 payerWalletAddress: ready.latestUmbraPayment.payerWalletAddress,
                 mint: ready.latestUmbraPayment.mint,
                 amountAtomic: ready.latestUmbraPayment.amountAtomic,
+                createUtxoSignature:
+                  ready.latestUmbraPayment.createUtxoSignature,
+                optionalData: ready.latestUmbraPayment.optionalData,
               },
             }),
           {

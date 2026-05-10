@@ -5,6 +5,7 @@ import type { ScannedUtxoData } from "@umbra-privacy/sdk/interfaces";
 import type { MasterSeed, U32 } from "@umbra-privacy/sdk/types";
 import { splitAddressToLowHigh } from "@umbra-privacy/sdk/utils";
 import { address } from "@solana/kit";
+import { Connection } from "@solana/web3.js";
 import type {
   ConnectedStandardSolanaWallet,
   UseSignMessage,
@@ -12,6 +13,7 @@ import type {
 } from "@privy-io/react-auth/solana";
 
 import { createPrivyUmbraSigner } from "@/features/checkout/privy-umbra-signer";
+import { decodeUmbraDepositEventsFromLogs } from "@/features/checkout/umbra-payment-verification";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import {
   createDueVaultClient,
@@ -38,8 +40,15 @@ type FindMerchantClaimableUmbraPaymentInput = {
     payerWalletAddress: string;
     mint: string;
     amountAtomic: string;
+    createUtxoSignature: string;
+    optionalData: string;
   };
   masterSeedStorage?: DueVaultConfig["masterSeedStorage"];
+};
+
+type GroundTruthIndices = {
+  treeIndex: string;
+  insertionIndex: string;
 };
 
 export function createClickScopedMasterSeedStorage(): NonNullable<
@@ -87,8 +96,11 @@ function addressPartsMatch(
 function utxoMatchesExpected(
   utxo: ScannedUtxoData,
   expected: FindMerchantClaimableUmbraPaymentInput["expected"],
+  indices: GroundTruthIndices,
 ) {
   return (
+    utxo.treeIndex.toString() === indices.treeIndex &&
+    utxo.insertionIndex.toString() === indices.insertionIndex &&
     utxo.destinationAddress === expected.destinationAddress &&
     utxo.amount.toString() === expected.amountAtomic &&
     addressPartsMatch(
@@ -102,6 +114,47 @@ function utxoMatchesExpected(
       expected.payerWalletAddress,
     )
   );
+}
+
+async function fetchGroundTruthIndices(
+  rpcUrl: string,
+  expected: FindMerchantClaimableUmbraPaymentInput["expected"],
+): Promise<GroundTruthIndices> {
+  const connection = new Connection(rpcUrl, "confirmed");
+  const transaction = await connection.getTransaction(
+    expected.createUtxoSignature,
+    {
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
+    },
+  );
+
+  if (!transaction || !transaction.meta || transaction.meta.err !== null) {
+    throw new Error(
+      "Could not load the Umbra create-UTXO transaction yet — try again in a few seconds.",
+    );
+  }
+
+  const event = decodeUmbraDepositEventsFromLogs(
+    transaction.meta.logMessages,
+  ).find(
+    (candidate) =>
+      candidate.depositor === expected.payerWalletAddress &&
+      candidate.mint === expected.mint &&
+      candidate.transferAmountAtomic === expected.amountAtomic &&
+      candidate.optionalData === expected.optionalData,
+  );
+
+  if (!event || !event.treeIndex || !event.insertionIndexInTree) {
+    throw new Error(
+      "Could not locate the Umbra deposit event for this payment.",
+    );
+  }
+
+  return {
+    treeIndex: event.treeIndex,
+    insertionIndex: event.insertionIndexInTree,
+  };
 }
 
 function serializeClaimabilityEvidence(
@@ -128,6 +181,7 @@ export async function findMerchantClaimableUmbraPayment({
   masterSeedStorage,
 }: FindMerchantClaimableUmbraPaymentInput) {
   const runtimeConfig = getUmbraRuntimeConfig();
+  const indices = await fetchGroundTruthIndices(runtimeConfig.rpcUrl, expected);
   const signer = createPrivyUmbraSigner({
     wallet,
     signTransaction,
@@ -144,7 +198,7 @@ export async function findMerchantClaimableUmbraPayment({
   const scanClaimableUtxos = getClaimableUtxoScannerFunction({ client });
   const scanned = await scanClaimableUtxos(0n as U32, 0n as U32);
   const match = [...scanned.received, ...scanned.publicReceived].find((utxo) =>
-    utxoMatchesExpected(utxo, expected),
+    utxoMatchesExpected(utxo, expected, indices),
   );
 
   if (!match) {
