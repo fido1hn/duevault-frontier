@@ -8,6 +8,10 @@ import type {
 import type { MasterSeed } from "@umbra-privacy/sdk/types";
 
 import { createPrivyUmbraSigner } from "@/features/checkout/privy-umbra-signer";
+import {
+  normalizeUmbraError,
+  toUmbraUserFacingError,
+} from "@/features/umbra/errors";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import {
   createPrivatePayment,
@@ -75,112 +79,6 @@ function createClickScopedMasterSeedStorage(): NonNullable<
   };
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function getErrorMessage(error: unknown) {
-  if (error instanceof Error && error.message.length > 0) {
-    return error.message;
-  }
-
-  if (isRecord(error) && typeof error.message === "string") {
-    return error.message;
-  }
-
-  return String(error);
-}
-
-function getNestedCause(error: unknown) {
-  if (!isRecord(error) || !("cause" in error)) {
-    return null;
-  }
-
-  return error.cause;
-}
-
-function getUmbraErrorStage(
-  error: unknown,
-  visited = new Set<unknown>(),
-): string | null {
-  if (!isRecord(error) || visited.has(error)) {
-    return null;
-  }
-
-  visited.add(error);
-  const stage = error.stage;
-
-  if (typeof stage === "string" && stage.length > 0) {
-    return stage;
-  }
-
-  return getUmbraErrorStage(getNestedCause(error), visited);
-}
-
-function readStringArray(value: unknown) {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === "string")
-    : [];
-}
-
-function collectSimulationLogs(
-  error: unknown,
-  visited = new Set<unknown>(),
-): string[] {
-  if (!isRecord(error) || visited.has(error)) {
-    return [];
-  }
-
-  visited.add(error);
-
-  return [
-    ...readStringArray(error.simulationLogs),
-    ...readStringArray(error.logs),
-    ...collectSimulationLogs(getNestedCause(error), visited),
-  ];
-}
-
-function collectCauseMessages(
-  error: unknown,
-  visited = new Set<unknown>(),
-): string[] {
-  if (!isRecord(error) || visited.has(error)) {
-    return [];
-  }
-
-  visited.add(error);
-
-  return [
-    getErrorMessage(error),
-    ...collectCauseMessages(getNestedCause(error), visited),
-  ];
-}
-
-function describeUmbraFailure(action: string, error: unknown) {
-  const message = getErrorMessage(error);
-  const stage = getUmbraErrorStage(error);
-  const causeDetails = collectCauseMessages(getNestedCause(error)).filter(
-    (detail) => detail !== message,
-  );
-  const simulationLogs = collectSimulationLogs(error);
-  const detailSuffix =
-    causeDetails.length > 0
-      ? ` Details: ${causeDetails.slice(0, 2).join(" | ")}`
-      : "";
-  const simulationSuffix =
-    simulationLogs.length > 0
-      ? ` Simulation logs: ${simulationLogs.slice(-8).join(" | ")}`
-      : "";
-
-  if (message === "Failed to fetch" || message === "fetch failed") {
-    return `${action} failed because an Umbra network request could not be reached. Retry in a moment; if it persists, check the configured RPC and Umbra ZK asset proxy.`;
-  }
-
-  return `${action} failed${
-    stage ? ` during ${stage}` : ""
-  }: ${message}${detailSuffix}${simulationSuffix}`;
-}
-
 async function ensureCustomerUmbraRegistration({
   config,
   onStep,
@@ -202,13 +100,13 @@ async function ensureCustomerUmbraRegistration({
       return;
     }
   } catch (error) {
-    throw new Error(describeUmbraFailure("Customer Umbra setup check", error));
+    throw toUmbraUserFacingError("Customer Umbra setup check", error);
   }
 
   try {
     await registerDueVaultUser(config);
   } catch (error) {
-    throw new Error(describeUmbraFailure("Customer Umbra setup", error));
+    throw toUmbraUserFacingError("Customer Umbra setup", error);
   }
 
   try {
@@ -221,9 +119,7 @@ async function ensureCustomerUmbraRegistration({
       throw new Error("Customer Umbra setup did not reach a ready state.");
     }
   } catch (error) {
-    throw new Error(
-      describeUmbraFailure("Customer Umbra setup verification", error),
-    );
+    throw toUmbraUserFacingError("Customer Umbra setup verification", error);
   }
 }
 
@@ -278,9 +174,7 @@ export async function runCustomerUmbraPayment({
       throw new Error("Merchant Umbra account is not fully registered.");
     }
   } catch (error) {
-    throw new Error(
-      describeUmbraFailure("Merchant Umbra readiness check", error),
-    );
+    throw toUmbraUserFacingError("Merchant Umbra readiness check", error);
   }
 
   await ensureCustomerUmbraRegistration({
@@ -326,11 +220,11 @@ export async function runCustomerUmbraPayment({
       createUtxoSignature: String(signatures.createUtxoSignature),
     };
   } catch (error) {
-    const simulationLogs = collectSimulationLogs(error);
+    const normalized = normalizeUmbraError("Umbra private payment", error);
     console.error("[Umbra customer payment] failed", {
-      error,
-      simulationLogs,
+      category: normalized.category,
+      debugMessage: normalized.debugMessage,
     });
-    throw new Error(describeUmbraFailure("Umbra private payment", error));
+    throw toUmbraUserFacingError("Umbra private payment", error);
   }
 }

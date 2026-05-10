@@ -9,6 +9,7 @@ import { serializeInvoice } from "@/features/invoices/mappers";
 import type { SerializedUmbraInvoicePayment } from "@/features/invoices/types";
 import { AuthError, authErrorResponse, requireMerchantProfile } from "@/server/auth";
 import { db } from "@/server/db";
+import { routeErrorResponse } from "@/server/route-errors";
 
 type ClaimAttemptRouteProps = {
   params: Promise<{
@@ -154,21 +155,9 @@ export async function POST(
       return authErrorResponse(error);
     }
 
-    if (error instanceof UmbraClaimSettlementError) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.status },
-      );
-    }
-
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to record claim attempt.",
-      },
-      { status: 400 },
-    );
+    return routeErrorResponse(error, "Unable to record claim attempt.", {
+      action: "record_umbra_claim_attempt",
+      route: "/api/invoices/[invoiceId]/umbra-payment/claim-attempt",
+    });
   }
 }

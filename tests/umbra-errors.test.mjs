@@ -14,6 +14,42 @@ describe("normalizeUmbraError", () => {
     expect(normalized.debugMessage).toContain("Failed to fetch");
   });
 
+  test("maps timeout, indexing, and indexer failures to retryable user copy", () => {
+    for (const error of [
+      new Error("AbortError: request timed out"),
+      new Error("RPC null result for Create UTXO abc123: not yet indexed"),
+      new Error("Unable to reach Umbra indexer."),
+    ]) {
+      const normalized = normalizeUmbraError("Umbra private payment", error);
+
+      expect(normalized.category).toBe("network");
+      expect(normalized.userMessage).toContain("Retry");
+    }
+  });
+
+  test("maps transaction expiry to retryable on-chain copy", () => {
+    const normalized = normalizeUmbraError(
+      "Umbra private payment",
+      new Error("TransactionExpiredBlockheightExceededError: blockhash expired"),
+    );
+
+    expect(normalized.category).toBe("transaction_expired");
+    expect(normalized.userMessage).toBe(
+      "The transaction expired before it could be confirmed. Please try again.",
+    );
+  });
+
+  test("maps rate limits to wait copy", () => {
+    const normalized = normalizeUmbraError("Umbra private payment", {
+      message: "HTTP 429 Too Many Requests",
+    });
+
+    expect(normalized.category).toBe("rate_limited");
+    expect(normalized.userMessage).toBe(
+      "Umbra or Solana services are busy. Please wait a moment and retry.",
+    );
+  });
+
   test("maps wallet rejection to cancellation copy", () => {
     const normalized = normalizeUmbraError(
       "Auditor x25519 registration",

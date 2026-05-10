@@ -9,6 +9,7 @@ import {
   parseRevokeGrantInput,
 } from "@/features/audit/validators";
 import { AuthError, authErrorResponse, requireMerchantProfile } from "@/server/auth";
+import { routeErrorResponse } from "@/server/route-errors";
 
 type RevokeRouteProps = {
   params: Promise<{
@@ -20,10 +21,6 @@ function errorStatus(error: unknown): number {
   if (error instanceof AuditServiceError) return error.status;
   if (error instanceof AuditValidationError) return error.status;
   return 400;
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }
 
 export async function POST(request: NextRequest, { params }: RevokeRouteProps) {
@@ -46,9 +43,10 @@ export async function POST(request: NextRequest, { params }: RevokeRouteProps) {
     return NextResponse.json({ grant });
   } catch (error) {
     if (error instanceof AuthError) return authErrorResponse(error);
-    return NextResponse.json(
-      { error: errorMessage(error, "Unable to revoke compliance grant.") },
-      { status: errorStatus(error) },
-    );
+    return routeErrorResponse(error, "Unable to revoke compliance grant.", {
+      action: "revoke_compliance_grant",
+      route: "/api/audit/grants/[grantId]/revoke",
+      status: errorStatus(error),
+    });
   }
 }

@@ -10,6 +10,7 @@ import { saveMerchantUmbraRegistration } from "@/features/merchant-profiles/serv
 import type { SaveUmbraRegistrationInput } from "@/features/merchant-profiles/types";
 import { sanitizeSaveUmbraRegistrationInput } from "@/features/merchant-profiles/validators";
 import { AuthError, authErrorResponse, requireAuthContext } from "@/server/auth";
+import { AppRouteError, routeErrorResponse } from "@/server/route-errors";
 
 export async function POST(request: NextRequest) {
   try {
@@ -57,14 +58,21 @@ export async function POST(request: NextRequest) {
         input.walletAddress,
       );
     } catch (error) {
-      return NextResponse.json(
+      return routeErrorResponse(
+        new AppRouteError(
+          {
+            code: "merchant_umbra_check_failed",
+            status: 502,
+            userMessage:
+              "Unable to verify Umbra registration. Please try again in a moment.",
+          },
+          { cause: error },
+        ),
+        "Unable to save Umbra registration.",
         {
-          error:
-            error instanceof Error
-              ? `Unable to verify Umbra registration on ${runtimeConfig.network} RPC. ${error.message}`
-              : `Unable to verify Umbra registration on ${runtimeConfig.network} RPC.`,
+          action: "verify_merchant_umbra_registration",
+          route: "/api/merchant-profile/umbra-registration",
         },
-        { status: 502 },
       );
     }
 
@@ -85,14 +93,9 @@ export async function POST(request: NextRequest) {
       return authErrorResponse(error);
     }
 
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to save Umbra registration.",
-      },
-      { status: 400 },
-    );
+    return routeErrorResponse(error, "Unable to save Umbra registration.", {
+      action: "save_merchant_umbra_registration",
+      route: "/api/merchant-profile/umbra-registration",
+    });
   }
 }

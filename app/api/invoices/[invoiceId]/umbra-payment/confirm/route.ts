@@ -20,6 +20,7 @@ import { getPaymentMintConfig } from "@/features/payments/mints";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import { AuthError, authErrorResponse, requireMerchantProfile } from "@/server/auth";
 import { db } from "@/server/db";
+import { routeErrorResponse } from "@/server/route-errors";
 
 type ConfirmUmbraPaymentRouteProps = {
   params: Promise<{
@@ -292,14 +293,9 @@ export async function POST(
       return authErrorResponse(error);
     }
 
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to confirm Umbra payment.",
-      },
-      { status: 400 },
-    );
+    return routeErrorResponse(error, "Unable to confirm Umbra payment.", {
+      action: "confirm_umbra_payment",
+      route: "/api/invoices/[invoiceId]/umbra-payment/confirm",
+    });
   }
 }

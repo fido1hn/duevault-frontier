@@ -5,6 +5,7 @@ import {
 } from "@/features/payment-intents/service";
 import type { CreatePaymentIntentInput } from "@/features/payment-intents/types";
 import { AuthError, authErrorResponse, requireMerchantProfile } from "@/server/auth";
+import { routeErrorResponse } from "@/server/route-errors";
 
 export async function GET(request: NextRequest) {
   try {
@@ -39,14 +40,9 @@ export async function POST(request: NextRequest) {
       return authErrorResponse(error);
     }
 
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to create payment request.",
-      },
-      { status: 400 },
-    );
+    return routeErrorResponse(error, "Unable to create payment request.", {
+      action: "create_payment_request",
+      route: "/api/payment-intents",
+    });
   }
 }

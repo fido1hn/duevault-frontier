@@ -9,6 +9,7 @@ import type { MasterSeed } from "@umbra-privacy/sdk/types";
 
 import { createPrivyUmbraSigner } from "@/features/checkout/privy-umbra-signer";
 import type { PaymentMintConfig } from "@/features/payments/mints";
+import { toUmbraUserFacingError } from "@/features/umbra/errors";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import type { DueVaultConfig } from "@/lib/umbra/sdk";
 import { queryPrivateBalance, withdrawPrivateBalance } from "@/lib/umbra/sdk";
@@ -51,31 +52,6 @@ export function createMerchantWalletMasterSeedStorage(): NonNullable<
   };
 }
 
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function getUmbraErrorStage(error: unknown) {
-  if (!error || typeof error !== "object" || !("stage" in error)) {
-    return null;
-  }
-
-  const stage = (error as { stage?: unknown }).stage;
-
-  return typeof stage === "string" && stage.length > 0 ? stage : null;
-}
-
-function describeMerchantWalletFailure(action: string, error: unknown) {
-  const message = getErrorMessage(error);
-  const stage = getUmbraErrorStage(error);
-
-  if (message === "Failed to fetch" || message === "fetch failed") {
-    return `${action} failed because an Umbra network request could not be reached. Check the configured RPC and indexer, then retry.`;
-  }
-
-  return `${action} failed${stage ? ` during ${stage}` : ""}: ${message}`;
-}
-
 function createMerchantWalletConfig({
   masterSeedStorage,
   mint,
@@ -104,7 +80,7 @@ export async function loadMerchantPrivateBalance(input: MerchantWalletActionInpu
   try {
     return await queryPrivateBalance(config, input.mint.address);
   } catch (error) {
-    throw new Error(describeMerchantWalletFailure("Balance refresh", error));
+    throw toUmbraUserFacingError("Balance refresh", error);
   }
 }
 
@@ -120,6 +96,6 @@ export async function withdrawMerchantPrivateBalance(
       input.atomicAmount,
     );
   } catch (error) {
-    throw new Error(describeMerchantWalletFailure("Withdrawal", error));
+    throw toUmbraUserFacingError("Withdrawal", error);
   }
 }

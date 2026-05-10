@@ -16,6 +16,7 @@ import {
 } from "@/lib/umbra/sdk";
 import { checkAuditDecryptRateLimit } from "@/server/audit-rate-limit";
 import { AuthError, authErrorResponse, requireAuthContext } from "@/server/auth";
+import { AppRouteError, routeErrorResponse } from "@/server/route-errors";
 
 const MAX_BODY_BYTES = 4_000;
 
@@ -65,10 +66,6 @@ function errorStatus(error: unknown): number {
   if (error instanceof AuditValidationError) return error.status;
   if (error instanceof AuditBodyError) return error.status;
   return 400;
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }
 
 export async function POST(request: NextRequest) {
@@ -121,15 +118,21 @@ export async function POST(request: NextRequest) {
         token.auditorAddress,
       );
     } catch (error) {
-      return NextResponse.json(
+      return routeErrorResponse(
+        new AppRouteError(
+          {
+            code: "auditor_x25519_check_failed",
+            status: 502,
+            userMessage:
+              "Unable to verify auditor Umbra registration. Please try again in a moment.",
+          },
+          { cause: error },
+        ),
+        "Unable to load evidence for this grant.",
         {
-          error:
-            error instanceof Error
-              ? `Unable to verify auditor Umbra registration on ${runtimeConfig.network} RPC. ${error.message}`
-              : `Unable to verify auditor Umbra registration on ${runtimeConfig.network} RPC.`,
-          code: "auditor_x25519_check_failed",
+          action: "verify_auditor_x25519",
+          route: "/api/audit/evidence-index",
         },
-        { status: 502 },
       );
     }
 
@@ -149,13 +152,10 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     if (error instanceof AuthError) return authErrorResponse(error);
 
-    const status = errorStatus(error);
-    const payload: Record<string, string> = {
-      error: errorMessage(error, "Unable to load evidence for this grant."),
-    };
-    if (error instanceof AuditServiceError) {
-      payload.code = error.code;
-    }
-    return NextResponse.json(payload, { status });
+    return routeErrorResponse(error, "Unable to load evidence for this grant.", {
+      action: "list_audit_evidence",
+      route: "/api/audit/evidence-index",
+      status: errorStatus(error),
+    });
   }
 }

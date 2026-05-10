@@ -18,6 +18,7 @@ import type {
   SaveUmbraRegistrationInput,
   SerializedUmbraAccountState,
 } from "@/features/merchant-profiles/types";
+import { toUmbraUserFacingError } from "@/features/umbra/errors";
 
 export type MerchantUmbraRegistrationStepId =
   | "checking"
@@ -35,32 +36,6 @@ type RunMerchantUmbraRegistrationInput = {
   signMessage: UseSignMessage["signMessage"];
   onStep?: (step: MerchantUmbraRegistrationStepId) => void;
 };
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function getUmbraErrorStage(error: unknown) {
-  if (!error || typeof error !== "object" || !("stage" in error)) {
-    return null;
-  }
-
-  const stage = (error as { stage?: unknown }).stage;
-
-  return typeof stage === "string" && stage.length > 0 ? stage : null;
-}
-
-function describeUmbraFailure(action: string, error: unknown) {
-  const message = getErrorMessage(error);
-  const stage = getUmbraErrorStage(error);
-
-  if (message === "Failed to fetch" || message === "fetch failed") {
-    return `${action} failed because an Umbra network request could not be reached. Restart the dev server and retry; if it persists, check the configured RPC and Umbra ZK asset proxy.`;
-  }
-
-  return `${action} failed${stage ? ` during ${stage}` : ""}: ${message}`;
-}
-
 
 export function serializeUmbraAccountState(
   account: QueryUserAccountResult,
@@ -107,7 +82,7 @@ export async function runMerchantUmbraRegistration({
   try {
     currentAccount = await queryDueVaultUserRegistration(config, walletAddress);
   } catch (error) {
-    throw new Error(describeUmbraFailure("Umbra account check", error));
+    throw toUmbraUserFacingError("Umbra account check", error);
   }
 
   if (isUmbraUserFullyRegistered(currentAccount)) {
@@ -152,7 +127,7 @@ export async function runMerchantUmbraRegistration({
       },
     });
   } catch (error) {
-    throw new Error(describeUmbraFailure("Umbra registration", error));
+    throw toUmbraUserFacingError("Umbra registration", error);
   }
 
   onStep?.("verifying");
@@ -161,7 +136,7 @@ export async function runMerchantUmbraRegistration({
   try {
     verifiedAccount = await queryDueVaultUserRegistration(config, walletAddress);
   } catch (error) {
-    throw new Error(describeUmbraFailure("Umbra post-registration check", error));
+    throw toUmbraUserFacingError("Umbra post-registration check", error);
   }
 
   if (!isUmbraUserFullyRegistered(verifiedAccount)) {

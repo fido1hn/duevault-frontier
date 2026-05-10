@@ -4,7 +4,9 @@ export type UmbraErrorCategory =
   | "insufficient_sol"
   | "missing_registration"
   | "already_registered"
+  | "rate_limited"
   | "simulation_failed"
+  | "transaction_expired"
   | "unknown";
 
 export type NormalizedUmbraError = {
@@ -79,25 +81,34 @@ function collectMessages(error: unknown, messages: string[] = []): string[] {
   return messages;
 }
 
-function collectLogs(error: unknown): string[] {
+function collectLogs(error: unknown, visited = new Set<unknown>()): string[] {
   if (!isRecord(error)) {
     return [];
   }
+
+  if (visited.has(error)) {
+    return [];
+  }
+
+  visited.add(error);
 
   const possibleLogs = [
     error.logs,
     error.simulationLogs,
     error.transactionLogs,
-    isRecord(error.cause) ? error.cause.logs : null,
   ];
+  const cause = getCause(error);
 
-  return possibleLogs.flatMap((logs) => {
-    if (!Array.isArray(logs)) {
-      return [];
-    }
+  return [
+    ...possibleLogs.flatMap((logs) => {
+      if (!Array.isArray(logs)) {
+        return [];
+      }
 
-    return logs.filter((log): log is string => typeof log === "string");
-  });
+      return logs.filter((log): log is string => typeof log === "string");
+    }),
+    ...(cause ? collectLogs(cause, visited) : []),
+  ];
 }
 
 function getUmbraErrorStage(error: unknown) {
@@ -120,8 +131,12 @@ function userMessageForCategory(action: string, category: UmbraErrorCategory) {
       return "Register your Umbra x25519 key to continue.";
     case "already_registered":
       return "This Umbra key is already registered.";
+    case "rate_limited":
+      return "Umbra or Solana services are busy. Please wait a moment and retry.";
     case "simulation_failed":
       return `${action} could not be completed on-chain. Check your wallet balance and try again.`;
+    case "transaction_expired":
+      return "The transaction expired before it could be confirmed. Please try again.";
     case "unknown":
       return `${action} could not be completed. Please try again.`;
   }
@@ -147,8 +162,29 @@ export function normalizeUmbraError(
 
   let category: UmbraErrorCategory = "unknown";
 
-  if (includesAny(searchable, [/failed to fetch/, /fetch failed/])) {
+  if (
+    includesAny(searchable, [
+      /failed to fetch/,
+      /fetch failed/,
+      /aborterror/,
+      /timeout/,
+      /timed out/,
+      /not yet indexed/,
+      /rpc null result/,
+      /unable to reach umbra indexer/,
+      /indexer.*unavailable/,
+    ])
+  ) {
     category = "network";
+  } else if (
+    includesAny(searchable, [
+      /\b429\b/,
+      /too many requests/,
+      /rate limit/,
+      /rate-limited/,
+    ])
+  ) {
+    category = "rate_limited";
   } else if (
     includesAny(searchable, [
       /user rejected/,
@@ -182,6 +218,15 @@ export function normalizeUmbraError(
     category = "missing_registration";
   } else if (includesAny(searchable, [/already.*registered/])) {
     category = "already_registered";
+  } else if (
+    includesAny(searchable, [
+      /transactionexpired/,
+      /blockhash.*expired/,
+      /block height exceeded/,
+      /last valid block height/,
+    ])
+  ) {
+    category = "transaction_expired";
   } else if (
     includesAny(searchable, [
       /transaction simulation failed/,

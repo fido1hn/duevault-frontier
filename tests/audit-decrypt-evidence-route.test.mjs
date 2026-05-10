@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
 mock.module("server-only", () => ({}));
 
@@ -11,6 +11,7 @@ const requireAuthContext = mock();
 const checkAuditDecryptRateLimit = mock();
 const queryDueVaultUserRegistration = mock();
 const realUmbraSdk = await import("../lib/umbra/sdk.ts");
+const originalConsoleError = console.error;
 const fakeDb = {
   complianceGrant: {
     findUnique: mock(),
@@ -155,6 +156,7 @@ function unregisteredAccount() {
 }
 
 beforeEach(() => {
+  console.error = mock();
   requireAuthContext.mockReset();
   checkAuditDecryptRateLimit.mockReset();
   queryDueVaultUserRegistration.mockReset();
@@ -165,6 +167,10 @@ beforeEach(() => {
   queryDueVaultUserRegistration.mockResolvedValue(registeredAccount());
   fakeDb.complianceGrant.findUnique.mockResolvedValue(grantRecord());
   fakeDb.umbraInvoicePayment.findUnique.mockResolvedValue(paymentRecord());
+});
+
+afterEach(() => {
+  console.error = originalConsoleError;
 });
 
 describe("POST /api/audit/decrypt-evidence", () => {
@@ -199,6 +205,24 @@ describe("POST /api/audit/decrypt-evidence", () => {
 
     expect(response.status).toBe(409);
     expect(payload.code).toBe("auditor_x25519_missing");
+    expect(fakeDb.umbraInvoicePayment.findUnique).not.toHaveBeenCalled();
+  });
+
+  test("does not expose raw RPC errors when checking auditor registration", async () => {
+    requireAuthContext.mockResolvedValue(auth());
+    queryDueVaultUserRegistration.mockRejectedValue(
+      new Error("raw rpc detail: upstream blockstore unavailable"),
+    );
+
+    const response = await POST(request());
+    const payload = await response.json();
+
+    expect(response.status).toBe(502);
+    expect(payload.code).toBe("auditor_x25519_check_failed");
+    expect(payload.error).toBe(
+      "Unable to verify auditor Umbra registration. Please try again in a moment.",
+    );
+    expect(payload.error).not.toContain("blockstore");
     expect(fakeDb.umbraInvoicePayment.findUnique).not.toHaveBeenCalled();
   });
 

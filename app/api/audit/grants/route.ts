@@ -10,15 +10,12 @@ import {
   parsePersistIssuedGrantInput,
 } from "@/features/audit/validators";
 import { AuthError, authErrorResponse, requireMerchantProfile } from "@/server/auth";
+import { routeErrorResponse } from "@/server/route-errors";
 
 function errorStatus(error: unknown): number {
   if (error instanceof AuditServiceError) return error.status;
   if (error instanceof AuditValidationError) return error.status;
   return 400;
-}
-
-function errorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }
 
 export async function GET(request: NextRequest) {
@@ -28,10 +25,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ grants });
   } catch (error) {
     if (error instanceof AuthError) return authErrorResponse(error);
-    return NextResponse.json(
-      { error: errorMessage(error, "Unable to load compliance grants.") },
-      { status: errorStatus(error) },
-    );
+    return routeErrorResponse(error, "Unable to load compliance grants.", {
+      action: "list_compliance_grants",
+      route: "/api/audit/grants",
+      status: errorStatus(error),
+    });
   }
 }
 
@@ -64,9 +62,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof AuthError) return authErrorResponse(error);
-    return NextResponse.json(
-      { error: errorMessage(error, "Unable to record compliance grant.") },
-      { status: errorStatus(error) },
-    );
+    return routeErrorResponse(error, "Unable to record compliance grant.", {
+      action: "record_compliance_grant",
+      route: "/api/audit/grants",
+      status: errorStatus(error),
+    });
   }
 }

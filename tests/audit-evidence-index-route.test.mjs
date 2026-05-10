@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 
 mock.module("server-only", () => ({}));
 
@@ -11,6 +11,7 @@ const requireAuthContext = mock();
 const checkAuditDecryptRateLimit = mock();
 const queryDueVaultUserRegistration = mock();
 const realUmbraSdk = await import("../lib/umbra/sdk.ts");
+const originalConsoleError = console.error;
 const fakeDb = {
   complianceGrant: {
     findUnique: mock(),
@@ -136,6 +137,7 @@ function registeredAccount() {
 }
 
 beforeEach(() => {
+  console.error = mock();
   requireAuthContext.mockReset();
   checkAuditDecryptRateLimit.mockReset();
   queryDueVaultUserRegistration.mockReset();
@@ -151,6 +153,10 @@ beforeEach(() => {
   fakeDb.umbraInvoicePayment.findMany.mockResolvedValue([paymentRecord()]);
 });
 
+afterEach(() => {
+  console.error = originalConsoleError;
+});
+
 describe("POST /api/audit/evidence-index", () => {
   test("returns 403 when authenticated user does not own auditor wallet", async () => {
     requireAuthContext.mockResolvedValue({
@@ -162,6 +168,23 @@ describe("POST /api/audit/evidence-index", () => {
 
     expect(response.status).toBe(403);
     expect(payload.code).toBe("auditor_wallet_mismatch");
+    expect(fakeDb.umbraInvoicePayment.findMany).not.toHaveBeenCalled();
+  });
+
+  test("does not expose raw RPC errors when checking auditor registration", async () => {
+    queryDueVaultUserRegistration.mockRejectedValue(
+      new Error("raw rpc detail: upstream blockstore unavailable"),
+    );
+
+    const response = await POST(request());
+    const payload = await response.json();
+
+    expect(response.status).toBe(502);
+    expect(payload.code).toBe("auditor_x25519_check_failed");
+    expect(payload.error).toBe(
+      "Unable to verify auditor Umbra registration. Please try again in a moment.",
+    );
+    expect(payload.error).not.toContain("blockstore");
     expect(fakeDb.umbraInvoicePayment.findMany).not.toHaveBeenCalled();
   });
 

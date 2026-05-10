@@ -6,6 +6,7 @@ import {
 } from "@/features/merchant-profiles/service";
 import type { UpsertMerchantProfileInput } from "@/features/merchant-profiles/types";
 import { AuthError, authErrorResponse, requireAuthContext } from "@/server/auth";
+import { routeErrorResponse } from "@/server/route-errors";
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,15 +19,10 @@ export async function GET(request: NextRequest) {
       return authErrorResponse(error);
     }
 
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to load merchant profile.",
-      },
-      { status: 400 },
-    );
+    return routeErrorResponse(error, "Unable to load merchant profile.", {
+      action: "load_merchant_profile",
+      route: "/api/merchant-profile",
+    });
   }
 }
 
@@ -42,14 +38,9 @@ export async function POST(request: NextRequest) {
       return authErrorResponse(error);
     }
 
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to save merchant profile.",
-      },
-      { status: 400 },
-    );
+    return routeErrorResponse(error, "Unable to save merchant profile.", {
+      action: "save_merchant_profile",
+      route: "/api/merchant-profile",
+    });
   }
 }

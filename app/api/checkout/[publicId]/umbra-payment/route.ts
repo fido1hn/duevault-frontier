@@ -16,6 +16,7 @@ import { getInvoiceByPublicId } from "@/features/invoices/service";
 import { getPaymentMintConfig } from "@/features/payments/mints";
 import { getUmbraRuntimeConfig } from "@/lib/umbra/config";
 import { db } from "@/server/db";
+import { routeErrorResponse } from "@/server/route-errors";
 import { checkUmbraPaymentSaveRateLimit } from "@/server/umbra-payment-rate-limit";
 
 type UmbraPaymentRouteProps = {
@@ -334,21 +335,9 @@ export async function POST(
       payment: serializePublicUmbraPaymentStatus(payment),
     });
   } catch (error) {
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to save Umbra payment.",
-      },
-      {
-        status:
-          error instanceof UmbraPaymentSaveValidationError
-            ? error.status
-            : error instanceof UmbraPaymentConflictError
-              ? 409
-              : 400,
-      },
-    );
+    return routeErrorResponse(error, "Unable to save Umbra payment.", {
+      action: "save_umbra_payment",
+      route: "/api/checkout/[publicId]/umbra-payment",
+    });
   }
 }

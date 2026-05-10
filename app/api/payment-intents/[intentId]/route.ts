@@ -5,6 +5,7 @@ import {
 } from "@/features/payment-intents/service";
 import type { UpdatePaymentIntentInput } from "@/features/payment-intents/types";
 import { AuthError, authErrorResponse, requireMerchantProfile } from "@/server/auth";
+import { routeErrorResponse } from "@/server/route-errors";
 
 type PaymentIntentRouteProps = {
   params: Promise<{
@@ -64,14 +65,9 @@ export async function PATCH(
       return authErrorResponse(error);
     }
 
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unable to update payment request.",
-      },
-      { status: 400 },
-    );
+    return routeErrorResponse(error, "Unable to update payment request.", {
+      action: "update_payment_request",
+      route: "/api/payment-intents/[intentId]",
+    });
   }
 }

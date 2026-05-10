@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createInvoice, listInvoices } from "@/features/invoices/service";
 import type { CreateInvoiceInput } from "@/features/invoices/types";
 import { AuthError, authErrorResponse, requireMerchantProfile } from "@/server/auth";
+import { routeErrorResponse } from "@/server/route-errors";
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,12 +35,9 @@ export async function POST(request: NextRequest) {
       return authErrorResponse(error);
     }
 
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error ? error.message : "Unable to create invoice.",
-      },
-      { status: 400 },
-    );
+    return routeErrorResponse(error, "Unable to create invoice.", {
+      action: "create_invoice",
+      route: "/api/invoices",
+    });
   }
 }
