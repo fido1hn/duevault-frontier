@@ -1,14 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "motion/react";
 import { ArrowRight, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useMerchantProfile } from "@/components/merchant-profile-gate";
 import { Button } from "@/components/ui/button";
-import { useCreateInvoiceMutation } from "@/features/invoices/queries";
+import { computeNextInvoiceNumber } from "@/features/invoices/next-invoice-number";
+import {
+  useCreateInvoiceMutation,
+  useInvoicesQuery,
+} from "@/features/invoices/queries";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -61,9 +65,27 @@ function NewInvoiceContent() {
   const configuredMint = useMemo(() => getUmbraCheckoutMint(), []);
   const router = useRouter();
   const createInvoice = useCreateInvoiceMutation();
+  const { data: invoices, isLoading: invoicesLoading } = useInvoicesQuery();
+  const suggestedInvoiceNumber = useMemo(
+    () => computeNextInvoiceNumber(invoices),
+    [invoices],
+  );
   const [clientName, setClientName] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
+  const hasPrefilledInvoiceNumberRef = useRef(false);
+  useEffect(() => {
+    if (
+      hasPrefilledInvoiceNumberRef.current ||
+      invoicesLoading ||
+      invoiceNumber !== "" ||
+      suggestedInvoiceNumber === ""
+    ) {
+      return;
+    }
+    setInvoiceNumber(suggestedInvoiceNumber);
+    hasPrefilledInvoiceNumberRef.current = true;
+  }, [invoicesLoading, suggestedInvoiceNumber, invoiceNumber]);
   const [issuedAt, setIssuedAt] = useState(() => toDateInputValue(new Date()));
   const [dueAt, setDueAt] = useState(getDefaultDueDate);
   const [notes, setNotes] = useState(profile.defaultNotes);
