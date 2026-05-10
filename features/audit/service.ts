@@ -84,6 +84,22 @@ export async function listGrantsForMerchant(
   return records.map(serializeComplianceGrant);
 }
 
+export async function getGrantForMerchant(
+  merchantProfileId: string,
+  grantId: string,
+): Promise<SerializedComplianceGrant> {
+  const record = await findComplianceGrantByIdAndMerchant(
+    grantId,
+    merchantProfileId,
+  );
+
+  if (!record) {
+    throw new AuditServiceError("Grant not found.", "grant_not_found", 404);
+  }
+
+  return serializeComplianceGrant(record);
+}
+
 export async function markGrantRevokedForMerchant(
   merchantProfileId: string,
   grantId: string,

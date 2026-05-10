@@ -703,9 +703,14 @@ export default function CompliancePage() {
                 return (
                   <li
                     key={grant.id}
-                    className="flex flex-col gap-3 py-4 md:flex-row md:items-center md:justify-between"
+                    className="relative flex flex-col gap-3 py-4 transition-colors hover:bg-muted/20 md:flex-row md:items-center md:justify-between"
                   >
-                    <div className="flex min-w-0 flex-col gap-1">
+                    <Link
+                      href={`/compliance/grants/${grant.id}`}
+                      aria-label={`View ${grant.label || "unlabeled"} grant`}
+                      className="absolute inset-0 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset"
+                    />
+                    <div className="pointer-events-none flex min-w-0 flex-col gap-1">
                       <div className="flex items-center gap-2">
                         <p className="truncate font-medium text-foreground">
                           {grant.label || "Unlabeled grant"}
@@ -725,16 +730,20 @@ export default function CompliancePage() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="w-fit bg-card"
+                        className="relative z-10 w-fit bg-card"
                         disabled={!canSign || isRevokingThis}
-                        onClick={() => setRevokeConfirmId(grant.id)}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          setRevokeConfirmId(grant.id);
+                        }}
                       >
                         Revoke
                       </Button>
                     )}
 
                     {grant.status === "active" && isConfirming && (
-                      <div className="flex items-center gap-2">
+                      <div className="relative z-10 flex items-center gap-2">
                         <p className="text-xs text-muted-foreground">
                           Revoke this grant?
                         </p>
@@ -743,7 +752,11 @@ export default function CompliancePage() {
                           variant="destructive"
                           size="sm"
                           disabled={isRevokingThis}
-                          onClick={() => void handleRevoke(grant)}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void handleRevoke(grant);
+                          }}
                         >
                           {isRevokingThis ? (
                             <Loader2 className="size-4 animate-spin" />
@@ -757,7 +770,11 @@ export default function CompliancePage() {
                           variant="ghost"
                           size="sm"
                           disabled={isRevokingThis}
-                          onClick={() => setRevokeConfirmId(null)}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setRevokeConfirmId(null);
+                          }}
                         >
                           <X className="size-4" />
                           Cancel

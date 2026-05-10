@@ -40,6 +40,11 @@ type GrantsListResponse = {
   error?: string;
 };
 
+type GrantResponse = {
+  grant?: SerializedComplianceGrant;
+  error?: string;
+};
+
 type IssuedGrantResponse = {
   grant?: SerializedComplianceGrant;
   token?: GrantTokenPayload;
@@ -75,6 +80,28 @@ export async function listGrantsClient(getAuthToken: GetAuthToken) {
   }
 
   return payload.grants ?? [];
+}
+
+export async function getGrantClient(
+  grantId: string,
+  getAuthToken: GetAuthToken,
+) {
+  const response = await authenticatedFetch(
+    `/api/audit/grants/${encodeURIComponent(grantId)}`,
+    { cache: "no-store" },
+    getAuthToken,
+  );
+  const payload = (await response.json()) as GrantResponse;
+
+  if (!response.ok || !payload.grant) {
+    throw createApiClientError(
+      response,
+      "Unable to load compliance grant.",
+      payload.error,
+    );
+  }
+
+  return payload.grant;
 }
 
 async function persistIssuedGrant(
